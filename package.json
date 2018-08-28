@@ -56,7 +56,10 @@
     "electron-squirrel-startup": "^1.0.0",
     "react": "^16.4.2",
     "react-dom": "^16.4.2",
-    "react-hot-loader": "^4.3.5"
+    "react-hot-loader": "^4.3.5",
+    "reflect-metadata": "^0.1.12",
+    "sql.js": "^0.5.0",
+    "typeorm": "^0.2.7"
   },
   "devDependencies": {
     "babel-plugin-transform-async-to-generator": "^6.24.1",

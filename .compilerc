@@ -2,44 +2,30 @@
   "env": {
     "development": {
       "text/typescript": {
-        "removeComments": false,
-        "preserveConstEnums": true,
+        "strict": true,
+        "sourceMap": true,
         "declaration": true,
-        "noImplicitAny": true,
-        "noImplicitReturns": true,
-        "suppressImplicitAnyIndexErrors": true,
-        "strictNullChecks": true,
-        "noUnusedLocals": true,
-        "noImplicitThis": true,
-        "noUnusedParameters": true,
-        "inlineSourceMap": true,
-        "inlineSources": true,
-        "importHelpers": true,
-        "noEmitHelpers": true,
-        "experimentalDecorators": true,
-        "target": "es2015",
         "module": "commonjs",
-        "jsx": "react"
+        "pretty": true,
+        "target": "es6",
+        "jsx": "react",
+        "esModuleInterop": true,
+        "emitDecoratorMetadata": true,
+        "experimentalDecorators": true
       }
     },
     "production": {
       "text/typescript": {
-        "removeComments": false,
-        "preserveConstEnums": true,
+        "strict": true,
+        "sourceMap": true,
         "declaration": true,
-        "noImplicitAny": true,
-        "noImplicitReturns": true,
-        "suppressImplicitAnyIndexErrors": true,
-        "strictNullChecks": true,
-        "noUnusedLocals": true,
-        "noImplicitThis": true,
-        "noUnusedParameters": true,
-        "sourceMap": false,
-        "importHelpers": true,
-        "noEmitHelpers": true,
-        "experimentalDecorators": true,
-        "target": "es2015",
-        "jsx": "react"
+        "module": "commonjs",
+        "pretty": true,
+        "target": "es6",
+        "jsx": "react",
+        "esModuleInterop": true,
+        "emitDecoratorMetadata": true,
+        "experimentalDecorators": true
       }
     }
   }
