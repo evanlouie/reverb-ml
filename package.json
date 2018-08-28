@@ -9,7 +9,8 @@
     "package": "electron-forge package",
     "make": "electron-forge make",
     "publish": "electron-forge publish",
-    "lint": "tslint --project tsconfig.json --type-check --force"
+    "lint": "tslint --project tsconfig.json --type-check --force",
+    "prettier": "prettier --write 'src/**/*.{ts,tsx,js,jsx,json,md,css,scss}'"
   },
   "keywords": [],
   "author": "Evan Louie <evan.louie@microsoft.com>",
@@ -64,7 +65,14 @@
     "babel-preset-react": "^6.24.1",
     "electron-forge": "^5.2.2",
     "electron-prebuilt-compile": "2.0.7",
+    "prettier": "^1.14.2",
     "tslint": "^5.1.0",
+    "tslint-config-prettier": "^1.15.0",
     "typescript": "~3.0.1"
+  },
+  "prettier": {
+    "printWidth": 100,
+    "trailingComma": "all",
+    "arrowParens": "always"
   }
 }
