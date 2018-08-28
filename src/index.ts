@@ -1,3 +1,5 @@
+// Disable TSLint for next line to allow implicit import of electron (included in electron-forge)
+// tslint:disable-next-line
 import { app, BrowserWindow } from "electron";
 import { enableLiveReload } from "electron-compile";
 import installExtension, { REACT_DEVELOPER_TOOLS } from "electron-devtools-installer";

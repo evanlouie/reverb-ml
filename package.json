@@ -56,8 +56,7 @@
     "electron-squirrel-startup": "^1.0.0",
     "react": "^16.4.2",
     "react-dom": "^16.4.2",
-    "react-hot-loader": "^4.3.5",
-    "tslib": "^1.4.0"
+    "react-hot-loader": "^4.3.5"
   },
   "devDependencies": {
     "babel-plugin-transform-async-to-generator": "^6.24.1",
