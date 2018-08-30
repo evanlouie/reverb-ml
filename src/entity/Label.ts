@@ -16,5 +16,5 @@ export class Label extends BaseEntity {
   public value: string = "";
 
   @ManyToOne((type) => AudioFile, (file) => file.labels)
-  public file!: AudioFile;
+  public file: AudioFile | undefined;
 }

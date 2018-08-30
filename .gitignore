@@ -1,5 +1,6 @@
 out
 *.db
+.DS_Store
 
 # Logs
 logs

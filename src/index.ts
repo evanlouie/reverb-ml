@@ -21,6 +21,9 @@ const createWindow = async () => {
     width: 800,
   });
 
+  // Start with maximized window size
+  mainWindow.maximize();
+
   // and load the index.html of the app.
   mainWindow.loadURL(`file://${__dirname}/index.html`);
 

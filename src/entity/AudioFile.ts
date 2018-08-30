@@ -7,7 +7,10 @@ export class AudioFile extends BaseEntity {
   public id!: number;
 
   @Column()
-  public name: string = "";
+  public basename: string = "";
+
+  @Column()
+  public dirname: string = "";
 
   @Column()
   public size: number = -1;
@@ -16,5 +19,5 @@ export class AudioFile extends BaseEntity {
   public duration: number = -1;
 
   @OneToMany((type) => Label, (label) => label.file)
-  public labels!: Label[];
+  public labels: Label[] | undefined;
 }
