@@ -1,3 +1,8 @@
+/**
+ * Peaks.js TypeScript Definitions
+ * @author Evan Louie <evan.louie@microsoft.com> (https://evanlouie.com)
+ */
+
 declare module "peaks.js" {
   interface Segment {
     startTime: number;
@@ -36,7 +41,7 @@ declare module "peaks.js" {
     // to render the waveform if dataUri is not provided
     audioContext?: AudioContext;
     // async logging function
-    logger?: Console;
+    logger?: (...args: any[]) => void;
     // default height of the waveform canvases in pixels
     height?: number;
     // Array of zoom levels in samples per pixel (big >> small)

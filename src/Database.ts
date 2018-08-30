@@ -32,5 +32,5 @@ export class Database {
   }
 
   private static connection: Connection | undefined;
-  private static dbLocation = "echoml-sqljs.db";
+  private static dbLocation = "reverb-sqljs.db";
 }

@@ -57,9 +57,9 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
      */
     (async () => {
       const filename = basename(fileUrl) + ".wav";
-      const fileWritten = await promisify(writeFile)(filename, new Uint8Array(wavBuffer)).then(() =>
-        console.log(`Wrote out ${filename}`),
-      );
+      const fileWritten = await promisify(writeFile)(filename, new Uint8Array(wavBuffer));
+      console.info(`Wrote out ${filename}`);
+      return filename;
     })();
   };
 

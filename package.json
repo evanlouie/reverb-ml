@@ -1,7 +1,7 @@
 {
-  "name": "echo-ml",
-  "productName": "echo-ml",
-  "version": "1.0.0",
+  "name": "reverb-ml",
+  "productName": "reverb-ml",
+  "version": "0.0.1",
   "description": "An Electron app to play, visualize, and annotate your audio files for machine learning",
   "main": "src/index.ts",
   "scripts": {
@@ -33,17 +33,17 @@
         "packageManager": "yarn"
       },
       "electronWinstallerConfig": {
-        "name": "echo_ml"
+        "name": "reverb_ml"
       },
       "electronInstallerDebian": {},
       "electronInstallerRedhat": {},
       "github_repository": {
-        "owner": "",
-        "name": ""
+        "owner": "evanlouie",
+        "name": "evanlouie/reverb-ml"
       },
       "windowsStoreConfig": {
         "packageName": "",
-        "name": "echoml"
+        "name": "reverbml"
       }
     }
   },
