@@ -21,6 +21,9 @@ export class App extends React.Component<undefined, undefined> {
           <Grid item xs={12}>
             <AudioPlayer audioURL="file:///Users/evlouie/Downloads/seesaw.m4a" />
           </Grid>
+          <Grid item xs={12}>
+            <AudioPlayer audioURL="file:///Users/evlouie/Downloads/remember.m4a" />
+          </Grid>
         </Grid>
       </div>
     );

@@ -1,5 +1,5 @@
 import { Button } from "@material-ui/core";
-import { LabelImportant, Pause, PlayArrowRounded } from "@material-ui/icons";
+import { CloudDownload, LabelImportant, Pause, PlayArrowRounded } from "@material-ui/icons";
 import { Buffer } from "buffer";
 import { writeFile } from "fs";
 import { basename, dirname } from "path";
@@ -120,8 +120,8 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
           <Button mini key="pause-button" color="secondary" onClick={this.pauseAudio}>
             <Pause />
           </Button>,
-          <Button mini key="foo" onClick={() => AudioPlayer.convertAudioToWav(this.props.audioURL)}>
-            <Pause />
+          <Button mini key="download-labels" onClick={() => Label.exportLabels()}>
+            <CloudDownload />
           </Button>,
           <Button
             mini

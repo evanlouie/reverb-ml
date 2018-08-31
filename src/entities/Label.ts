@@ -1,8 +1,16 @@
+import { writeFile } from "fs";
 import { BaseEntity, Column, Entity, ManyToOne, PrimaryGeneratedColumn } from "typeorm";
+import { promisify } from "util";
 import { AudioFile } from "./AudioFile";
 
 @Entity()
 export class Label extends BaseEntity {
+  public static async exportLabels() {
+    const labels = await Label.find();
+    await promisify(writeFile)("db.json", JSON.stringify(labels), { encoding: "utf8" });
+    console.log("WROTE OUT FILES");
+  }
+
   @PrimaryGeneratedColumn()
   public id!: number;
 

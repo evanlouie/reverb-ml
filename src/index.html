@@ -15,7 +15,8 @@
   import * as ReactDOM from "react-dom";
   import "reflect-metadata";
   import { AppContainer } from "react-hot-loader";
-  import { createConnection } from "typeorm";
+  //import { createConnection } from "typeorm";
+  import { Database } from "./Database";
   
   let render = () => {
     const { App } = require("./app");
@@ -28,7 +29,7 @@
   };
   
   // Make sure to create database connection in top-level context
-  createConnection().then(() => {
+  Database.createConnection().then(() => {
     render();
     if (module.hot) {
       // module.hot.accept(render);

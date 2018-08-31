@@ -8,3 +8,5 @@ export const selectFiles = (): Promise<string[]> =>
       (files) => resolve(files),
     ),
   );
+
+export const getPath = (name: string): string => remote.app.getPath(name);
