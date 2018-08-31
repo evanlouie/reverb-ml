@@ -36,6 +36,6 @@ export class Label extends BaseEntity {
   @JoinColumn()
   public sampleData!: DataBlob;
 
-  @ManyToOne((type) => AudioFile, (file) => file.labels)
+  @ManyToOne((type) => AudioFile, (file) => file.labels, { nullable: false })
   public audioFile!: AudioFile;
 }

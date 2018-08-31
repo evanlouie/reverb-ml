@@ -164,26 +164,42 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
   };
 
   private addLabel = async (label: { startTime: number; endTime?: number; labelText?: string }) => {
-    const { peaks, defaultLabel } = this.state;
+    const { peaks, defaultLabel, audioFileP, audioBufferP } = this.state;
     const [startTime, endTime, labelText] = [
       label.startTime,
       label.endTime || label.startTime + 1, // Default to an endTime of startTime+1
       label.labelText || defaultLabel,
     ];
-    const peaksSegment = { startTime, endTime, labelText };
-    const { audioFileP, audioBufferP } = this.state;
-    const [audioFile, audioBuffer] = await Promise.all([audioFileP, audioBufferP]);
-    const slicedSegment = await Audio.sliceAudioBuffer(audioBuffer, label.startTime, endTime);
+    const peaksSegmentId = Math.random()
+      .toString(36)
+      .substring(7);
+    const peaksSegment = { id: peaksSegmentId, startTime, endTime, labelText };
+    const slicedSegment = await Audio.sliceAudioBuffer(
+      await audioBufferP,
+      label.startTime,
+      endTime,
+    );
     // DANGEROUS!! Using Node `Buffer` in front-end code so we can save the segment to DB. Will appear as a Uint8Array on client side when queried
-    const dataBlob = await DataBlob.create({
-      blob: Buffer.from(WavEncoder.encode(slicedSegment)),
-    }).save();
+    const [audioFile, sampleData] = await Promise.all([
+      audioFileP,
+      DataBlob.create({
+        blob: Buffer.from(WavEncoder.encode(slicedSegment)),
+      }).save(),
+    ]);
 
-    const savedLabel = await Label.create({
-      ...peaksSegment,
+    const savedLabel = Label.create({
+      startTime,
+      endTime,
+      labelText,
       audioFile,
-      sampleData: dataBlob,
-    }).save();
+      sampleData,
+    })
+      .save()
+      .catch((err) => {
+        console.error(err);
+        console.info(`Removing segment ${peaksSegmentId} from player`);
+        const removePeakSegment = peaks && peaks.segments.removeById(peaksSegmentId);
+      });
 
     return peaks
       ? peaks.segments.add(peaksSegment)
