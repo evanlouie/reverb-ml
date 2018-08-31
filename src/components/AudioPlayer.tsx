@@ -9,6 +9,7 @@ import { promisify } from "util";
 import { Audio } from "../Audio";
 import { Database } from "../Database";
 import { AudioFile } from "../entities/AudioFile";
+import { DataBlob } from "../entities/DataBlob";
 import { Label } from "../entities/Label";
 import { WavEncoder } from "../WavEncoder";
 
@@ -173,11 +174,15 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
     const { audioFileP, audioBufferP } = this.state;
     const [audioFile, audioBuffer] = await Promise.all([audioFileP, audioBufferP]);
     const slicedSegment = await Audio.sliceAudioBuffer(audioBuffer, label.startTime, endTime);
-    const audioSegment = Buffer.from(WavEncoder.encode(slicedSegment)); // DANGEROUS!! Using Node `Buffer` in front-end code so we can save the segment to DB. Will appear as a Uint8Array on client side when queried
+    // DANGEROUS!! Using Node `Buffer` in front-end code so we can save the segment to DB. Will appear as a Uint8Array on client side when queried
+    const dataBlob = await DataBlob.create({
+      blob: Buffer.from(WavEncoder.encode(slicedSegment)),
+    }).save();
+
     const savedLabel = await Label.create({
       ...peaksSegment,
       audioFile,
-      audioSegment,
+      sampleData: dataBlob,
     }).save();
 
     return peaks

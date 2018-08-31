@@ -1,7 +1,16 @@
 import { writeFile } from "fs";
-import { BaseEntity, Column, Entity, ManyToOne, PrimaryGeneratedColumn } from "typeorm";
+import {
+  BaseEntity,
+  Column,
+  Entity,
+  JoinColumn,
+  ManyToOne,
+  OneToOne,
+  PrimaryGeneratedColumn,
+} from "typeorm";
 import { promisify } from "util";
 import { AudioFile } from "./AudioFile";
+import { DataBlob } from "./DataBlob";
 
 @Entity()
 export class Label extends BaseEntity {
@@ -23,11 +32,9 @@ export class Label extends BaseEntity {
   @Column()
   public labelText!: string;
 
-  // Node `Buffer` implements JS TypedArray `Uint8Array`.
-  // Buffer required type in order to properly serialize to DB drivers.
-  // Will show up as Uint8Array in client
-  @Column()
-  public audioSegment!: Buffer;
+  @OneToOne((type) => DataBlob, { nullable: false })
+  @JoinColumn()
+  public sampleData!: DataBlob;
 
   @ManyToOne((type) => AudioFile, (file) => file.labels)
   public audioFile!: AudioFile;
