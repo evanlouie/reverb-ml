@@ -21,6 +21,7 @@ interface IAudioPlayerState {
   audioBufferP: Promise<AudioBuffer>;
   audioContext: AudioContext;
   audioFileP: Promise<AudioFile>;
+  defaultLabel: string;
   peaks: PeaksInstance | null;
 }
 
@@ -72,6 +73,7 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
       audioBufferP,
       audioContext: new AudioContext(),
       audioFileP,
+      defaultLabel: "Random Label",
       peaks: null,
     };
   }
@@ -112,10 +114,10 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
     return (
       <div className="AudioPlayer">
         {peaks && [
-          <Button mini key="play-button" onClick={this.playAudio}>
+          <Button mini key="play-button" color="primary" onClick={this.playAudio}>
             <PlayArrowRounded />
           </Button>,
-          <Button mini key="pause-button" onClick={this.pauseAudio}>
+          <Button mini key="pause-button" color="secondary" onClick={this.pauseAudio}>
             <Pause />
           </Button>,
           <Button mini key="foo" onClick={() => AudioPlayer.convertAudioToWav(this.props.audioURL)}>
@@ -124,6 +126,7 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
           <Button
             mini
             key="label-button"
+            color="primary"
             onClick={() => this.addLabel({ startTime: peaks.player.getCurrentTime() })}
           >
             <LabelImportant />
@@ -142,6 +145,9 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
     );
   }
 
+  ////////////////////////////////////////////////////////////////////////////////
+  // Helpers
+  ////////////////////////////////////////////////////////////////////////////////
   private playAudio = async () => {
     const { peaks } = this.state;
     return peaks
@@ -157,11 +163,11 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
   };
 
   private addLabel = async (label: { startTime: number; endTime?: number; labelText?: string }) => {
-    const { peaks } = this.state;
+    const { peaks, defaultLabel } = this.state;
     const [startTime, endTime, labelText] = [
       label.startTime,
       label.endTime || label.startTime + 1, // Default to an endTime of startTime+1
-      "randomLabel",
+      label.labelText || defaultLabel,
     ];
     const peaksSegment = { startTime, endTime, labelText };
     const { audioFileP, audioBufferP } = this.state;
@@ -196,12 +202,4 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
     endTime: l.endTime,
     labelText: l.labelText,
   });
-
-  private pullSegments = async () => {
-    const { peaks } = this.state;
-    const audioFile = await this.state.audioFileP;
-    const labels = await audioFile.getLabels();
-    const segments = labels.map(this.labelToPeaksSegment);
-    return peaks && peaks.segments.add(segments);
-  };
 }

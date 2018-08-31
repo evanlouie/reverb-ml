@@ -15,8 +15,11 @@ export class Label extends BaseEntity {
   @Column()
   public labelText!: string;
 
+  // Node `Buffer` implements JS TypedArray `Uint8Array`.
+  // Buffer required type in order to properly serialize to DB drivers.
+  // Will show up as Uint8Array in client
   @Column()
-  public audioSegment!: Buffer; // Node Buffer implements JS TypedArray Uint8Array
+  public audioSegment!: Buffer;
 
   @ManyToOne((type) => AudioFile, (file) => file.labels)
   public audioFile!: AudioFile;

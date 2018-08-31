@@ -9,7 +9,7 @@ export class Audio {
     start: number,
     end: number,
   ): Promise<AudioBuffer> => {
-    const { duration, sampleRate, numberOfChannels } = buffer;
+    const { duration, sampleRate, numberOfChannels, length } = buffer;
     const isValidTimeFrame = start < end && end < duration;
     if (isValidTimeFrame === false) {
       throw new Error(
