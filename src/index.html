@@ -11,16 +11,28 @@
 
 <script>window.exports = module.exports</script>
 <script type="text/tsx">
-import * as React from 'react';
-import * as ReactDOM from 'react-dom';
-import {AppContainer} from 'react-hot-loader';
-
-let render = () => {
-  const { App } = require('./app');
-  ReactDOM.render(<AppContainer><App /></AppContainer>, document.getElementById('App'));
-}
-
-render();
-if (module.hot) { module.hot.accept(render); }
+  import * as React from "react";
+  import * as ReactDOM from "react-dom";
+  import "reflect-metadata";
+  import { AppContainer } from "react-hot-loader";
+  import { createConnection } from "typeorm";
+  
+  let render = () => {
+    const { App } = require("./app");
+    ReactDOM.render(
+      <AppContainer>
+        <App />
+      </AppContainer>,
+      document.getElementById("App"),
+    );
+  };
+  
+  // Make sure to create database connection in top-level context
+  createConnection().then(() => {
+    render();
+    if (module.hot) {
+      // module.hot.accept(render);
+    }
+  });
 </script>
 </html>

@@ -1,5 +1,9 @@
 out
 *.db
+*.sql
+*.sqlite
+*.sqlite3
+*.wav
 .DS_Store
 
 # Logs

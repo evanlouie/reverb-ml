@@ -7,14 +7,17 @@ export class Label extends BaseEntity {
   public id!: number;
 
   @Column()
-  public start: number = -1;
+  public startTime!: number;
 
   @Column()
-  public end: number = -1;
+  public endTime!: number;
 
   @Column()
-  public value: string = "";
+  public labelText!: string;
+
+  @Column()
+  public audioSegment!: Buffer; // Node Buffer implements JS TypedArray Uint8Array
 
   @ManyToOne((type) => AudioFile, (file) => file.labels)
-  public file: AudioFile | undefined;
+  public audioFile!: AudioFile;
 }

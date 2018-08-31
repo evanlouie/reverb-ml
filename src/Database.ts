@@ -1,36 +1,20 @@
 import { readFile } from "fs";
 import "reflect-metadata";
-import { Connection, createConnection } from "typeorm";
+import { Connection, createConnection, getConnection } from "typeorm";
 import { promisify } from "util";
-import { AudioFile } from "./entity/AudioFile";
-import { Label } from "./entity/Label";
+import { AudioFile } from "./entities/AudioFile";
+import { Label } from "./entities/Label";
 
 export class Database {
+  public static createConnection() {
+    return createConnection();
+  }
+
   public static async getConnection(): Promise<Connection> {
-    return Database.connection
-      ? Database.connection
-      : (this.connection = await createConnection({
-          type: "sqljs",
-          entities: [AudioFile, Label],
-          synchronize: true,
-          location: Database.dbLocation,
-          autoSave: true,
-        }));
+    return getConnection();
   }
 
   public static async closeConnection() {
-    const conn = await this.getConnection();
-    conn.close();
+    return this.getConnection().then((conn) => conn.close());
   }
-
-  public static async exportDatabase(): Promise<Uint8Array> {
-    return promisify(readFile)(this.dbLocation);
-  }
-
-  public static async isConnected(): Promise<boolean> {
-    return this.getConnection().then((con) => con.isConnected);
-  }
-
-  private static connection: Connection | undefined;
-  private static dbLocation = "reverb-sqljs.db";
 }

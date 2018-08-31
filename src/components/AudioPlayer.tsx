@@ -1,10 +1,15 @@
 import { Button } from "@material-ui/core";
-import { Pause, PlayArrowRounded } from "@material-ui/icons";
+import { LabelImportant, Pause, PlayArrowRounded } from "@material-ui/icons";
+import { Buffer } from "buffer";
 import { writeFile } from "fs";
-import { basename } from "path";
+import { basename, dirname } from "path";
 import PeaksJS, { PeaksInstance } from "peaks.js";
 import React from "react";
 import { promisify } from "util";
+import { Audio } from "../Audio";
+import { Database } from "../Database";
+import { AudioFile } from "../entities/AudioFile";
+import { Label } from "../entities/Label";
 import { WavEncoder } from "../WavEncoder";
 
 interface IAudioPlayerProps {
@@ -12,55 +17,37 @@ interface IAudioPlayerProps {
 }
 
 interface IAudioPlayerState {
+  audioBlobP: Promise<Blob>; // store blob in memory
+  audioBufferP: Promise<AudioBuffer>;
   audioContext: AudioContext;
+  audioFileP: Promise<AudioFile>;
   peaks: PeaksInstance | null;
 }
 
 export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPlayerState> {
   private static convertAudioToWav = async (fileUrl: string) => {
-    /**
-     * Convert a Blob to an ArrayBuffer
-     * https://stackoverflow.com/questions/15341912/how-to-go-from-blob-to-arraybuffer
-     */
-    const blobToArrayBuffer = async (blob: Blob): Promise<ArrayBuffer> =>
-      new Promise<ArrayBuffer>((resolve, reject) => {
-        const fileReader = new FileReader();
-        fileReader.onload = (_) => {
-          const { result } = fileReader;
-          return result && typeof result !== "string"
-            ? resolve(result)
-            : reject(
-                new Error(
-                  `FileReader result invalid type; expected ArrayBuffer got: ${typeof result}: ${result}`,
-                ),
-              );
-        };
-        fileReader.readAsArrayBuffer(blob);
-      });
-
-    const offlineAudioContext = new OfflineAudioContext(2, 44100 * 40, 44100);
-    // const audioNode = offlineAudioContext.createBufferSource();
+    // NOTE `.decodeAudioData()` mutates and empties the buffer it uses
+    // Store file in memory as a Blob (which are immutable) and generate ArrayBuffer to operate on it immutably
     const audioBlob = await fetch(fileUrl).then((r) => r.blob());
-    const audioArrayBuffer = await blobToArrayBuffer(audioBlob);
+    const [audioData, audioBuffer] = await Promise.all([
+      new Response(audioBlob).arrayBuffer().then((b) => new Uint8Array(b)),
+      new Response(audioBlob)
+        .arrayBuffer()
+        .then((buffer) => new OfflineAudioContext(2, 44100 * 40, 44100).decodeAudioData(buffer)),
+    ]);
 
-    const buffer = await offlineAudioContext.decodeAudioData(audioArrayBuffer);
-    // const channels = [...Array(buffer.numberOfChannels)].map((_, i) => buffer.getChannelData(i));
-    // const [ch1, ch2] = [buffer.getChannelData(1), buffer.getChannelData(2)];
-    const wavBuffer = WavEncoder.encode(buffer);
-    // const asBlob = new Blob([new Uint8Array(wavBuffer)], { type: "audio/wav" });
-    // const downloadURL = URL.createObjectURL(asBlob);
-    // console.log(wavBuffer, asBlob, downloadURL);
+    const wavBuffer = WavEncoder.encode(audioBuffer);
 
     /**
      * Write out the file to disk
      * Dangerously uses Node APIs
      */
-    (async () => {
+    (async (wavArrayBuffer: ArrayBuffer) => {
       const filename = basename(fileUrl) + ".wav";
       const fileWritten = await promisify(writeFile)(filename, new Uint8Array(wavBuffer));
       console.info(`Wrote out ${filename}`);
       return filename;
-    })();
+    })(wavBuffer);
   };
 
   /**
@@ -73,8 +60,18 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
     super(props);
     this.peaksContainerRef = React.createRef<HTMLDivElement>();
     this.audioElementRef = React.createRef<HTMLAudioElement>();
+    const audioBlobP = fetch(props.audioURL).then((r) => r.blob());
+    const audioBufferP = audioBlobP.then((blob) =>
+      new Response(blob)
+        .arrayBuffer()
+        .then((buffer) => new OfflineAudioContext(2, 44100 * 40, 44100).decodeAudioData(buffer)),
+    );
+    const audioFileP = this.getRecord();
     this.state = {
+      audioBlobP,
+      audioBufferP,
       audioContext: new AudioContext(),
+      audioFileP,
       peaks: null,
     };
   }
@@ -83,17 +80,20 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
    * On initial mount, initialize PeaksJS into DOM
    */
   public async componentDidMount() {
+    const { audioFileP } = this.state;
     const [peaksDiv, audioTag] = [this.peaksContainerRef.current, this.audioElementRef.current];
+    const audioFile = await audioFileP;
+    const labels = await audioFile.getLabels();
     const peaks = await (peaksDiv && audioTag
       ? PeaksJS.init({
           container: this.peaksContainerRef.current as HTMLDivElement,
           mediaElement: this.audioElementRef.current as HTMLAudioElement,
           audioContext: this.state.audioContext,
+          segments: labels.map(this.labelToPeaksSegment),
         })
       : Promise.reject(
           new Error("Failed to initialize Peaks; Container or AudioElement refs are set to null."),
         ));
-
     this.setState({ peaks });
   }
 
@@ -108,17 +108,28 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
   }
 
   public render() {
+    const { peaks } = this.state;
     return (
       <div className="AudioPlayer">
-        <Button mini onClick={this.playAudio}>
-          <PlayArrowRounded />
-        </Button>
-        <Button mini onClick={this.pauseAudio}>
-          <Pause />
-        </Button>
-        <Button mini onClick={() => AudioPlayer.convertAudioToWav(this.props.audioURL)}>
-          <Pause />
-        </Button>
+        {peaks && [
+          <Button mini key="play-button" onClick={this.playAudio}>
+            <PlayArrowRounded />
+          </Button>,
+          <Button mini key="pause-button" onClick={this.pauseAudio}>
+            <Pause />
+          </Button>,
+          <Button mini key="foo" onClick={() => AudioPlayer.convertAudioToWav(this.props.audioURL)}>
+            <Pause />
+          </Button>,
+          <Button
+            mini
+            key="label-button"
+            onClick={() => this.addLabel({ startTime: peaks.player.getCurrentTime() })}
+          >
+            <LabelImportant />
+          </Button>,
+        ]}
+
         <div
           className="peaks-container"
           ref={this.peaksContainerRef}
@@ -147,9 +158,50 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
 
   private addLabel = async (label: { startTime: number; endTime?: number; labelText?: string }) => {
     const { peaks } = this.state;
-    const peaksLabel = { endTime: label.startTime + 1, ...label }; // Default to an endTime of startTime+1
+    const [startTime, endTime, labelText] = [
+      label.startTime,
+      label.endTime || label.startTime + 1, // Default to an endTime of startTime+1
+      "randomLabel",
+    ];
+    const peaksSegment = { startTime, endTime, labelText };
+    const { audioFileP, audioBufferP } = this.state;
+    const [audioFile, audioBuffer] = await Promise.all([audioFileP, audioBufferP]);
+    const slicedSegment = await Audio.sliceAudioBuffer(audioBuffer, label.startTime, endTime);
+    const audioSegment = Buffer.from(WavEncoder.encode(slicedSegment)); // DANGEROUS!! Using Node `Buffer` in front-end code so we can save the segment to DB. Will appear as a Uint8Array on client side when queried
+    const savedLabel = await Label.create({
+      ...peaksSegment,
+      audioFile,
+      audioSegment,
+    }).save();
+
     return peaks
-      ? peaks.segments.add(peaksLabel)
-      : Promise.reject(new Error(`Failed to add label: ${peaksLabel}`));
+      ? peaks.segments.add(peaksSegment)
+      : Promise.reject(new Error(`Failed to add label: ${peaksSegment}`));
+  };
+
+  private getRecord = async () => {
+    const { audioURL } = this.props;
+    const props = {
+      dirname: dirname(audioURL),
+      basename: basename(audioURL),
+    };
+    return Database.getConnection().then(async (_) => {
+      const record = await AudioFile.findOne(props);
+      return record ? record : AudioFile.create(props).save();
+    });
+  };
+
+  private labelToPeaksSegment = (l: Label) => ({
+    startTime: l.startTime,
+    endTime: l.endTime,
+    labelText: l.labelText,
+  });
+
+  private pullSegments = async () => {
+    const { peaks } = this.state;
+    const audioFile = await this.state.audioFileP;
+    const labels = await audioFile.getLabels();
+    const segments = labels.map(this.labelToPeaksSegment);
+    return peaks && peaks.segments.add(segments);
   };
 }
