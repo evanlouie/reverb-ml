@@ -186,19 +186,18 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
       endTime,
     );
     // DANGEROUS!! Using Node `Buffer` in front-end code so we can save the segment to DB. Will appear as a Uint8Array on client side when queried
-    const [audioFile, classification, sampleData] = await Promise.all([
+    const [audioFile, sampleData] = await Promise.all([
       audioFileP,
-      this.getClassification(labelText),
       DataBlob.create({
         blob: Buffer.from(WavEncoder.encode(slicedSegment)),
       }).save(),
     ]);
-
+    const addPeaksSegment = peaks && peaks.segments.add(peaksSegment);
     const savedLabel = Label.create({
       startTime,
       endTime,
       audioFile,
-      classification,
+      classification: labelText,
       sampleData,
     })
       .save()
@@ -206,11 +205,22 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
         console.error(err);
         console.info(`Removing segment ${peaksSegmentId} from player`);
         const removePeakSegment = peaks && peaks.segments.removeById(peaksSegmentId);
+        return Promise.reject(err);
       });
 
-    return peaks
-      ? peaks.segments.add(peaksSegment)
-      : Promise.reject(new Error(`Failed to add label: ${peaksSegment}`));
+    return savedLabel;
+  };
+
+  private addLabelToPeaks = async (...labels: Label[]) => {
+    const { peaks } = this.state;
+    const segments = labels.map((l) => ({
+      startTime: l.startTime,
+      endTime: l.endTime,
+      labelText: l.classification,
+    }));
+    if (peaks) {
+      peaks.segments.add(segments);
+    }
   };
 
   private getRecord = async () => {
@@ -229,7 +239,7 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
     return {
       startTime: l.startTime,
       endTime: l.endTime,
-      labelText: l.classification.name,
+      labelText: l.classification,
     };
   };
 
@@ -248,13 +258,20 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
     const audioBuffer = await this.state.audioBufferP;
     const audioDuration = audioBuffer.duration - 1; // -1 because total length might be round up
     const randomTimes = [...Array(1000)].map(() => Math.floor(Math.random() * audioDuration));
-    if (peaks) {
-      for (const startTime of randomTimes) {
-        const labelText = randomLabels[Math.floor(Math.random() * randomLabels.length)];
-        await this.addLabel({ startTime, labelText });
-      }
-    } else {
-      throw new Error("peaks not truthy");
+    for (const startTime of randomTimes) {
+      const labelText = randomLabels[Math.floor(Math.random() * randomLabels.length)];
+      const label = await this.addLabel({ startTime, labelText });
+      await this.addLabelToPeaks(label);
     }
+    // const labels = await Promise.all(
+    //   randomTimes.map((startTime) => {
+    //     const labelText = randomLabels[Math.floor(Math.random() * randomLabels.length)];
+    //     return this.addLabel({ startTime, labelText }).then((label) => {
+    //       this.addLabelToPeaks(label);
+    //       return label;
+    //     });
+    //   }),
+    // );
+    // return labels;
   };
 }

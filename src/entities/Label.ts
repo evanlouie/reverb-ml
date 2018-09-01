@@ -1,8 +1,9 @@
 import { writeFile } from "fs";
 import {
   BaseEntity,
-  Column,
+  Column
   Entity,
+  Index,
   JoinColumn,
   ManyToOne,
   OneToOne,
@@ -30,11 +31,15 @@ export class Label extends BaseEntity {
   @Column()
   public endTime!: number;
 
-  @ManyToOne((type) => Classification, (classification) => classification.labels, {
-    nullable: false,
-    eager: true,
-  })
-  public classification!: Classification;
+  @Index()
+  @Column()
+  public classification!: string;
+
+  // @ManyToOne((type) => Classification, (classification) => classification.labels, {
+  //   nullable: false,
+  //   eager: true,
+  // })
+  // public classification!: Classification;
 
   @OneToOne((type) => DataBlob, { nullable: false })
   @JoinColumn()
