@@ -135,6 +135,9 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
           >
             <LabelImportant />
           </Button>,
+          <Button mini key="test-data" color="secondary" onClick={() => this.spawnTestData()}>
+            Foo
+          </Button>,
         ]}
 
         <div
@@ -223,16 +226,35 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
   };
 
   private labelToPeaksSegment = async (l: Label) => {
-    const classification = await l.classification;
     return {
       startTime: l.startTime,
       endTime: l.endTime,
-      labelText: classification.name,
+      labelText: l.classification.name,
     };
   };
 
   private getClassification = async (name: string) => {
     const c = await Classification.findOne({ name });
     return c || Classification.create({ name }).save();
+  };
+
+  private spawnTestData = async () => {
+    const { peaks } = this.state;
+    const randomLabels = [...Array(10)].map(() =>
+      Math.random()
+        .toString(36)
+        .substring(7),
+    );
+    const audioBuffer = await this.state.audioBufferP;
+    const audioDuration = audioBuffer.duration - 1; // -1 because total length might be round up
+    const randomTimes = [...Array(1000)].map(() => Math.floor(Math.random() * audioDuration));
+    if (peaks) {
+      for (const startTime of randomTimes) {
+        const labelText = randomLabels[Math.floor(Math.random() * randomLabels.length)];
+        await this.addLabel({ startTime, labelText });
+      }
+    } else {
+      throw new Error("peaks not truthy");
+    }
   };
 }

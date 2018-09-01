@@ -32,8 +32,9 @@ export class Label extends BaseEntity {
 
   @ManyToOne((type) => Classification, (classification) => classification.labels, {
     nullable: false,
+    eager: true,
   })
-  public classification!: Classification | Promise<Classification>;
+  public classification!: Classification;
 
   @OneToOne((type) => DataBlob, { nullable: false })
   @JoinColumn()
