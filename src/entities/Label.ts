@@ -10,6 +10,7 @@ import {
 } from "typeorm";
 import { promisify } from "util";
 import { AudioFile } from "./AudioFile";
+import { Classification } from "./Classification";
 import { DataBlob } from "./DataBlob";
 
 @Entity()
@@ -29,8 +30,10 @@ export class Label extends BaseEntity {
   @Column()
   public endTime!: number;
 
-  @Column()
-  public labelText!: string;
+  @ManyToOne((type) => Classification, (classification) => classification.labels, {
+    nullable: false,
+  })
+  public classification!: Classification | Promise<Classification>;
 
   @OneToOne((type) => DataBlob, { nullable: false })
   @JoinColumn()

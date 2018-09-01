@@ -9,6 +9,7 @@ import { promisify } from "util";
 import { Audio } from "../Audio";
 import { Database } from "../Database";
 import { AudioFile } from "../entities/AudioFile";
+import { Classification } from "../entities/Classification";
 import { DataBlob } from "../entities/DataBlob";
 import { Label } from "../entities/Label";
 import { WavEncoder } from "../WavEncoder";
@@ -22,7 +23,7 @@ interface IAudioPlayerState {
   audioBufferP: Promise<AudioBuffer>;
   audioContext: AudioContext;
   audioFileP: Promise<AudioFile>;
-  defaultLabel: string;
+  classificationText: string;
   peaks: PeaksInstance | null;
 }
 
@@ -74,7 +75,7 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
       audioBufferP,
       audioContext: new AudioContext(),
       audioFileP,
-      defaultLabel: "Random Label",
+      classificationText: "Random Label",
       peaks: null,
     };
   }
@@ -87,12 +88,14 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
     const [peaksDiv, audioTag] = [this.peaksContainerRef.current, this.audioElementRef.current];
     const audioFile = await audioFileP;
     const labels = await audioFile.getLabels();
+    console.log(labels);
+    const segments = await Promise.all(labels.map(this.labelToPeaksSegment));
     const peaks = await (peaksDiv && audioTag
       ? PeaksJS.init({
           container: this.peaksContainerRef.current as HTMLDivElement,
           mediaElement: this.audioElementRef.current as HTMLAudioElement,
           audioContext: this.state.audioContext,
-          segments: labels.map(this.labelToPeaksSegment),
+          segments,
         })
       : Promise.reject(
           new Error("Failed to initialize Peaks; Container or AudioElement refs are set to null."),
@@ -164,11 +167,11 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
   };
 
   private addLabel = async (label: { startTime: number; endTime?: number; labelText?: string }) => {
-    const { peaks, defaultLabel, audioFileP, audioBufferP } = this.state;
+    const { peaks, classificationText, audioFileP, audioBufferP } = this.state;
     const [startTime, endTime, labelText] = [
       label.startTime,
       label.endTime || label.startTime + 1, // Default to an endTime of startTime+1
-      label.labelText || defaultLabel,
+      label.labelText || classificationText,
     ];
     const peaksSegmentId = Math.random()
       .toString(36)
@@ -180,8 +183,9 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
       endTime,
     );
     // DANGEROUS!! Using Node `Buffer` in front-end code so we can save the segment to DB. Will appear as a Uint8Array on client side when queried
-    const [audioFile, sampleData] = await Promise.all([
+    const [audioFile, classification, sampleData] = await Promise.all([
       audioFileP,
+      this.getClassification(labelText),
       DataBlob.create({
         blob: Buffer.from(WavEncoder.encode(slicedSegment)),
       }).save(),
@@ -190,8 +194,8 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
     const savedLabel = Label.create({
       startTime,
       endTime,
-      labelText,
       audioFile,
+      classification,
       sampleData,
     })
       .save()
@@ -218,9 +222,17 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
     });
   };
 
-  private labelToPeaksSegment = (l: Label) => ({
-    startTime: l.startTime,
-    endTime: l.endTime,
-    labelText: l.labelText,
-  });
+  private labelToPeaksSegment = async (l: Label) => {
+    const classification = await l.classification;
+    return {
+      startTime: l.startTime,
+      endTime: l.endTime,
+      labelText: classification.name,
+    };
+  };
+
+  private getClassification = async (name: string) => {
+    const c = await Classification.findOne({ name });
+    return c || Classification.create({ name }).save();
+  };
 }
