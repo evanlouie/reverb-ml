@@ -13,7 +13,7 @@ export class App extends React.Component<undefined, undefined> {
       <div className="App">
         <Grid container spacing={24}>
           <Grid item xs={12}>
-            <h2>Welcome to React with Typescript!</h2>
+            <h2>Reverb-ML!</h2>
           </Grid>
           <Grid item xs={4}>
             <button onClick={this.openDialog}>File searcher</button>
@@ -21,9 +21,9 @@ export class App extends React.Component<undefined, undefined> {
           <Grid item xs={12}>
             <AudioPlayer audioURL="file:///Users/evlouie/Downloads/seesaw.m4a" />
           </Grid>
-          <Grid item xs={12}>
+          {/* <Grid item xs={12}>
             <AudioPlayer audioURL="file:///Users/evlouie/Downloads/remember.m4a" />
-          </Grid>
+          </Grid> */}
         </Grid>
       </div>
     );

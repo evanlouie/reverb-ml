@@ -2,6 +2,7 @@
   "extends": ["tslint:latest", "tslint-config-prettier"],
   "rules": {
     "object-literal-sort-keys": false,
-    "no-console": false
+    "no-console": false,
+    "variable-name": [true, "check-format", "allow-leading-underscore", "allow-trailing-underscore"]
   }
 }

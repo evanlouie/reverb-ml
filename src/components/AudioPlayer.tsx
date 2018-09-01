@@ -3,7 +3,7 @@ import { CloudDownload, LabelImportant, Pause, PlayArrowRounded } from "@materia
 import { Buffer } from "buffer";
 import { writeFile } from "fs";
 import { basename, dirname } from "path";
-import PeaksJS, { PeaksInstance } from "peaks.js";
+import PeaksJS, { PeaksInstance, Segment } from "peaks.js";
 import React from "react";
 import { promisify } from "util";
 import { Audio } from "../Audio";
@@ -19,11 +19,11 @@ interface IAudioPlayerProps {
 }
 
 interface IAudioPlayerState {
-  audioBlobP: Promise<Blob>; // store blob in memory
-  audioBufferP: Promise<AudioBuffer>;
+  audioBlob_: Promise<Blob>; // store blob in memory
+  audioBuffer_: Promise<AudioBuffer>;
   audioContext: AudioContext;
-  audioFileP: Promise<AudioFile>;
-  classificationText: string;
+  audioFile_: Promise<AudioFile>;
+  classification_: Promise<Classification>;
   peaks: PeaksInstance | null;
 }
 
@@ -63,19 +63,23 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
     super(props);
     this.peaksContainerRef = React.createRef<HTMLDivElement>();
     this.audioElementRef = React.createRef<HTMLAudioElement>();
-    const audioBlobP = fetch(props.audioURL).then((r) => r.blob());
-    const audioBufferP = audioBlobP.then((blob) =>
+    const audioBlob_ = fetch(props.audioURL).then((r) => r.blob());
+    const audioBuffer_ = audioBlob_.then((blob) =>
       new Response(blob)
         .arrayBuffer()
         .then((buffer) => new OfflineAudioContext(2, 44100 * 40, 44100).decodeAudioData(buffer)),
     );
-    const audioFileP = this.getRecord();
+    const defaultClassifier = { name: "Default Classifier" };
+    const classification_ = Classification.findOne(defaultClassifier).then((c) => {
+      return c ? c : Classification.create(defaultClassifier).save();
+    });
+    const audioFile_ = this.getRecord();
     this.state = {
-      audioBlobP,
-      audioBufferP,
+      audioBlob_,
+      audioBuffer_,
       audioContext: new AudioContext(),
-      audioFileP,
-      classificationText: "Random Label",
+      audioFile_,
+      classification_,
       peaks: null,
     };
   }
@@ -84,9 +88,9 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
    * On initial mount, initialize PeaksJS into DOM
    */
   public async componentDidMount() {
-    const { audioFileP } = this.state;
+    const { audioFile_ } = this.state;
     const [peaksDiv, audioTag] = [this.peaksContainerRef.current, this.audioElementRef.current];
-    const audioFile = await audioFileP;
+    const audioFile = await audioFile_;
     const labels = await audioFile.getLabels();
     console.log(labels);
     const segments = await Promise.all(labels.map(this.labelToPeaksSegment));
@@ -131,7 +135,12 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
             mini
             key="label-button"
             color="primary"
-            onClick={() => this.addLabel({ startTime: peaks.player.getCurrentTime() })}
+            onClick={() =>
+              this.addLabel({
+                startTime: peaks.player.getCurrentTime(),
+                classification: "Default Class",
+              })
+            }
           >
             <LabelImportant />
           </Button>,
@@ -169,42 +178,50 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
       : Promise.reject(new Error(`Failed to call pause() on peaks instance; instance: ${peaks}`));
   };
 
-  private addLabel = async (label: { startTime: number; endTime?: number; labelText?: string }) => {
-    const { peaks, classificationText, audioFileP, audioBufferP } = this.state;
-    const [startTime, endTime, labelText] = [
+  private addLabel = async (label: {
+    startTime: number;
+    endTime?: number;
+    classification: Classification | string;
+  }) => {
+    const { peaks, audioFile_, audioBuffer_ } = this.state;
+    const classification_ =
+      typeof label.classification === "string"
+        ? Promise.resolve(this.getClassification(label.classification))
+        : label.classification;
+    const [startTime, endTime] = [
       label.startTime,
       label.endTime || label.startTime + 1, // Default to an endTime of startTime+1
-      label.labelText || classificationText,
     ];
     const peaksSegmentId = Math.random()
       .toString(36)
       .substring(7);
-    const peaksSegment = { id: peaksSegmentId, startTime, endTime, labelText };
     const slicedSegment = await Audio.sliceAudioBuffer(
-      await audioBufferP,
+      await audioBuffer_,
       label.startTime,
       endTime,
     );
     // DANGEROUS!! Using Node `Buffer` in front-end code so we can save the segment to DB. Will appear as a Uint8Array on client side when queried
-    const [audioFile, sampleData] = await Promise.all([
-      audioFileP,
+    const [audioFile, classification, sampleData] = await Promise.all([
+      audioFile_,
+      classification_,
       DataBlob.create({
         blob: Buffer.from(WavEncoder.encode(slicedSegment)),
       }).save(),
     ]);
-    const addPeaksSegment = peaks && peaks.segments.add(peaksSegment);
+    const peaksSegment = { id: peaksSegmentId, startTime, endTime, labelText: classification.name };
+    const _addPeaksSegment = peaks && peaks.segments.add(peaksSegment);
     const savedLabel = Label.create({
       startTime,
       endTime,
       audioFile,
-      classification: labelText,
+      classification,
       sampleData,
     })
       .save()
       .catch((err) => {
         console.error(err);
         console.info(`Removing segment ${peaksSegmentId} from player`);
-        const removePeakSegment = peaks && peaks.segments.removeById(peaksSegmentId);
+        const _removePeakSegment = peaks && peaks.segments.removeById(peaksSegmentId);
         return Promise.reject(err);
       });
 
@@ -216,7 +233,7 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
     const segments = labels.map((l) => ({
       startTime: l.startTime,
       endTime: l.endTime,
-      labelText: l.classification,
+      labelText: l.classification.name,
     }));
     if (peaks) {
       peaks.segments.add(segments);
@@ -235,11 +252,11 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
     });
   };
 
-  private labelToPeaksSegment = async (l: Label) => {
+  private labelToPeaksSegment = async (l: Label): Promise<Segment> => {
     return {
       startTime: l.startTime,
       endTime: l.endTime,
-      labelText: l.classification,
+      labelText: l.classification.name,
     };
   };
 
@@ -249,29 +266,26 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
   };
 
   private spawnTestData = async () => {
-    const { peaks } = this.state;
-    const randomLabels = [...Array(10)].map(() =>
-      Math.random()
-        .toString(36)
-        .substring(7),
+    const classifications = await Promise.all(
+      [...Array(10)]
+        .map(() =>
+          Math.random()
+            .toString(36)
+            .substring(7),
+        )
+        .map((labelText) => Classification.create({ name: labelText }).save()),
     );
-    const audioBuffer = await this.state.audioBufferP;
+    const audioBuffer = await this.state.audioBuffer_;
     const audioDuration = audioBuffer.duration - 1; // -1 because total length might be round up
-    const randomTimes = [...Array(1000)].map(() => Math.floor(Math.random() * audioDuration));
-    for (const startTime of randomTimes) {
-      const labelText = randomLabels[Math.floor(Math.random() * randomLabels.length)];
-      const label = await this.addLabel({ startTime, labelText });
-      await this.addLabelToPeaks(label);
-    }
-    // const labels = await Promise.all(
-    //   randomTimes.map((startTime) => {
-    //     const labelText = randomLabels[Math.floor(Math.random() * randomLabels.length)];
-    //     return this.addLabel({ startTime, labelText }).then((label) => {
-    //       this.addLabelToPeaks(label);
-    //       return label;
-    //     });
-    //   }),
-    // );
-    // return labels;
+    const randomTimes = [...Array(1000)].map(() => Math.random() * audioDuration);
+    const labels_ = randomTimes.map(async (startTime) => {
+      const classification = classifications[Math.floor(Math.random() * classifications.length)];
+      return this.addLabel({ startTime, classification }).then((label) => {
+        this.addLabelToPeaks(label);
+        return label;
+      });
+    });
+
+    return labels_;
   };
 }
