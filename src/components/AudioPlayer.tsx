@@ -92,7 +92,6 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
     const [peaksDiv, audioTag] = [this.peaksContainerRef.current, this.audioElementRef.current];
     const audioFile = await audioFile_;
     const labels = await audioFile.getLabels();
-    console.log(labels);
     const segments = await Promise.all(labels.map(this.labelToPeaksSegment));
     const peaks = await (peaksDiv && audioTag
       ? PeaksJS.init({
@@ -111,10 +110,8 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
    * Ensure Peaks is destroyed before unmounting (memory leaks).
    */
   public async componentWillUnmount() {
-    const { peaks } = this.state;
-    const destroyPeaks = await (peaks
-      ? peaks.destroy()
-      : Promise.reject(new Error("Unable to destroy Peaks instance; Peaks instance not truth-y.")));
+    const { audioContext, peaks } = this.state;
+    const _cleanupAudio = await Promise.all([audioContext.close(), peaks && peaks.destroy()]);
   }
 
   public render() {
