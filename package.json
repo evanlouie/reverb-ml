@@ -68,7 +68,7 @@
     "typeorm": "^0.2.7"
   },
   "devDependencies": {
-    "@types/node": "^10.9.3",
+    "@types/node": "^10.9.4",
     "babel-plugin-transform-async-to-generator": "^6.24.1",
     "babel-preset-env": "^1.7.0",
     "babel-preset-react": "^6.24.1",
