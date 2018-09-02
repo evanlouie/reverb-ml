@@ -8,7 +8,6 @@ export class Filesystem {
    */
   public static async readFileAsBlob(filepath: string): Promise<Blob> {
     const buffer = await promisify(fs.readFile)(filepath);
-    const blob = await new Response(buffer).blob();
-    return blob;
+    return new Response(buffer).blob();
   }
 }
