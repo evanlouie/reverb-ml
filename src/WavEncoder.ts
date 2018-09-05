@@ -24,11 +24,11 @@ export class WavEncoder {
     samples: Float32Array,
     format: 3 | 1,
     sampleRate: number,
-    numChannels: number,
+    numberOfChannels: number,
     bitDepth: 32 | 16,
   ) {
     const bytesPerSample = bitDepth / 8;
-    const blockAlign = numChannels * bytesPerSample;
+    const blockAlign = numberOfChannels * bytesPerSample;
 
     const buffer = new ArrayBuffer(44 + samples.length * bytesPerSample);
     const view = new DataView(buffer);
@@ -46,7 +46,7 @@ export class WavEncoder {
     /* sample format (raw) */
     view.setUint16(20, format, true);
     /* channel count */
-    view.setUint16(22, numChannels, true);
+    view.setUint16(22, numberOfChannels, true);
     /* sample rate */
     view.setUint32(24, sampleRate, true);
     /* byte rate (sample rate * block align) */

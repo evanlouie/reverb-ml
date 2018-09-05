@@ -10,4 +10,9 @@ export class Filesystem {
     const buffer = await promisify(fs.readFile)(filepath);
     return new Response(buffer).blob();
   }
+
+  public static async readFileAsBuffer(filepath: string): Promise<Uint8Array> {
+    const buffer = await promisify(fs.readFile)(filepath);
+    return buffer;
+  }
 }

@@ -41,7 +41,7 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
     const { audioBlob } = this.props;
     const audioBuffer_ = new Response(audioBlob)
       .arrayBuffer()
-      .then((buffer) => new OfflineAudioContext(2, 44100 * 40, 44100).decodeAudioData(buffer));
+      .then((buffer) => new OfflineAudioContext(2, 16000 * 40, 16000).decodeAudioData(buffer)); // two channels at 16000hz
     const defaultClassifier = { name: "Default Classifier" };
     const classification_ = Classification.findOne(defaultClassifier).then((c) => {
       return c ? c : Classification.create(defaultClassifier).save();
@@ -248,23 +248,20 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
         .map(() =>
           Math.random()
             .toString(36)
-            .substring(7),
+            .substring(2),
         )
         .map((labelText) => Classification.create({ name: labelText }).save()),
     );
     const audioBuffer = await this.state.audioBuffer_;
     const audioDuration = audioBuffer.duration - 1; // -1 because total length might be round up
     const randomTimes = [...Array(1000)].map(() => Math.random() * audioDuration);
-    const labels_ = Promise.all(
+    const labels = await Promise.all(
       randomTimes.map(async (startTime) => {
         const classification = classifications[Math.floor(Math.random() * classifications.length)];
-        return this.addLabel({ startTime, classification }).then((label) => {
-          this.addLabelToPeaks(label);
-          return label;
-        });
+        return this.addLabel({ startTime, classification });
       }),
     );
 
-    return labels_;
+    return labels;
   };
 }

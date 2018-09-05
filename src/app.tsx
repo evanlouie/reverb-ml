@@ -8,12 +8,12 @@ interface IAppState {
   audioFiles: IAudioPlayerProps[];
 }
 
-const player = ({ audioBlob, filepath }: IAudioPlayerProps) => (
-  <Grid item xs={12} key={filepath}>
+const player = (props: IAudioPlayerProps) => (
+  <Grid item xs={12} key={props.filepath}>
     <Typography variant="title" gutterBottom>
-      {filepath}
+      {props.filepath}
     </Typography>
-    <AudioPlayer audioBlob={audioBlob} filepath={filepath} />
+    <AudioPlayer {...props} />
   </Grid>
 );
 

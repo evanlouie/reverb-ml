@@ -26,6 +26,7 @@ export class Audio {
       .map((_, i) => buffer.getChannelData(i))
       .map((channelData) => channelData.slice(startSample, endSample))
       .forEach((floatArr, channel) => sliceBuffer.copyToChannel(floatArr, channel));
+
     return sliceBuffer;
   };
 }
