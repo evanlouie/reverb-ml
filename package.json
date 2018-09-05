@@ -48,7 +48,7 @@
     }
   },
   "dependencies": {
-    "@material-ui/core": "^3.0.1",
+    "@material-ui/core": "^3.0.2",
     "@material-ui/icons": "^3.0.1",
     "@tensorflow/tfjs": "^0.12.6",
     "@types/electron-devtools-installer": "^2.0.2",
@@ -59,7 +59,7 @@
     "electron-devtools-installer": "^2.1.0",
     "electron-squirrel-startup": "^1.0.0",
     "fs-extra": "^7.0.0",
-    "peaks.js": "^0.9.12",
+    "peaks.js": "^0.9.13",
     "react": "^16.4.2",
     "react-dom": "^16.4.2",
     "react-hot-loader": "^4.3.5",

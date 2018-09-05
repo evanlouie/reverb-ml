@@ -1,20 +1,19 @@
 import { Button, Grid, Typography } from "@material-ui/core";
 import * as React from "react";
-import { AudioPlayer } from "./components/AudioPlayer";
+import { AudioPlayer, IAudioPlayerProps } from "./components/AudioPlayer";
 import { Filesystem } from "./Filesystem";
 import { selectAudioFiles, selectFiles } from "./lib";
 
 interface IAppState {
-  audioFilePaths: string[];
-  audioFiles: { [systemFilepath: string]: string }; // value == local blob URL
+  audioFiles: IAudioPlayerProps[];
 }
 
-const player = (audioPath: string) => (
-  <Grid item xs={12} key={audioPath}>
+const player = ({ audioBlob, filepath }: IAudioPlayerProps) => (
+  <Grid item xs={12} key={filepath}>
     <Typography variant="title" gutterBottom>
-      {audioPath}
+      {filepath}
     </Typography>
-    <AudioPlayer audioURL={audioPath} />
+    <AudioPlayer audioBlob={audioBlob} filepath={filepath} />
   </Grid>
 );
 
@@ -22,20 +21,26 @@ export class App extends React.PureComponent<any, IAppState> {
   constructor(props: any) {
     super(props);
     this.state = {
-      audioFiles: {},
-      audioFilePaths: [],
+      audioFiles: [],
     };
   }
 
-  public openDialog = async () => {
-    const files = await selectAudioFiles();
-    const blobs = await Promise.all(files.slice(0, 3).map(Filesystem.readFileAsBlob));
-    const fileUrls = blobs.map(URL.createObjectURL);
-    this.setState({ audioFilePaths: fileUrls });
+  public selectAudio = async () => {
+    const filepaths = await selectAudioFiles();
+    const audioFiles = await Promise.all(
+      filepaths.map(async (filepath) => {
+        const audioBlob = await Filesystem.readFileAsBlob(filepath);
+        return {
+          audioBlob,
+          filepath,
+        };
+      }),
+    );
+    this.setState({ audioFiles });
   };
 
   public render() {
-    const { audioFilePaths } = this.state;
+    const { audioFiles } = this.state;
     return (
       <div className="App" style={{ padding: 12 }}>
         <Grid container spacing={24}>
@@ -46,18 +51,18 @@ export class App extends React.PureComponent<any, IAppState> {
           </Grid>
           <Grid container>
             <Grid item xs={4}>
-              <Button color="primary" onClick={this.openDialog}>
+              <Button color="primary" onClick={this.selectAudio}>
                 File searcher
               </Button>
             </Grid>
           </Grid>
           <Grid container>
-            {audioFilePaths.length === 0 ? (
+            {audioFiles.length === 0 ? (
               <Grid item xs={12}>
                 <Typography variant="body1">Select audio file before to begin labelling</Typography>
               </Grid>
             ) : (
-              audioFilePaths.map(player)
+              audioFiles.map(player)
             )}
           </Grid>
         </Grid>

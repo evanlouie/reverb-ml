@@ -16,7 +16,7 @@ export class Audio {
         `Invalid start and/or end time; start must be less than end and end must be less than total duration; ${start} < ${end} < ${duration}`,
       );
     }
-    const [startSample, endSample] = [start * sampleRate, end * sampleRate];
+    const [startSample, endSample] = [start, end].map((time) => time * sampleRate);
     const sectionLength = endSample - startSample;
     const audioCtx = new OfflineAudioContext(numberOfChannels, sectionLength, sampleRate);
     const sliceBuffer = audioCtx.createBuffer(numberOfChannels, sectionLength, sampleRate);

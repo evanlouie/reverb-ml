@@ -5,7 +5,6 @@ import { writeFile } from "fs";
 import { basename, dirname } from "path";
 import PeaksJS, { PeaksInstance, Segment } from "peaks.js";
 import React from "react";
-import { promisify } from "util";
 import { Audio } from "../Audio";
 import { Database } from "../Database";
 import { AudioFile } from "../entities/AudioFile";
@@ -14,12 +13,13 @@ import { DataBlob } from "../entities/DataBlob";
 import { Label } from "../entities/Label";
 import { WavEncoder } from "../WavEncoder";
 
-interface IAudioPlayerProps {
-  audioURL: string;
+export interface IAudioPlayerProps {
+  audioBlob: Blob;
+  filepath: string; // actual location on filesystem
 }
 
 interface IAudioPlayerState {
-  audioBlob_: Promise<Blob>; // store blob in memory
+  audioUrl: string;
   audioBuffer_: Promise<AudioBuffer>;
   audioContext: AudioContext;
   audioFile_: Promise<AudioFile>;
@@ -28,31 +28,6 @@ interface IAudioPlayerState {
 }
 
 export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPlayerState> {
-  private static convertAudioToWav = async (fileUrl: string) => {
-    // NOTE `.decodeAudioData()` mutates and empties the buffer it uses
-    // Store file in memory as a Blob (which are immutable) and generate ArrayBuffer to operate on it immutably
-    const audioBlob = await fetch(fileUrl).then((r) => r.blob());
-    const [audioData, audioBuffer] = await Promise.all([
-      new Response(audioBlob).arrayBuffer().then((b) => new Uint8Array(b)),
-      new Response(audioBlob)
-        .arrayBuffer()
-        .then((buffer) => new OfflineAudioContext(2, 44100 * 40, 44100).decodeAudioData(buffer)),
-    ]);
-
-    const wavBuffer = WavEncoder.encode(audioBuffer);
-
-    /**
-     * Write out the file to disk
-     * Dangerously uses Node APIs
-     */
-    (async (wavArrayBuffer: ArrayBuffer) => {
-      const filename = basename(fileUrl) + ".wav";
-      const fileWritten = await promisify(writeFile)(filename, new Uint8Array(wavBuffer));
-      console.info(`Wrote out ${filename}`);
-      return filename;
-    })(wavBuffer);
-  };
-
   /**
    * DOM refs to keep track of elements for Peaks to mount
    */
@@ -63,21 +38,19 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
     super(props);
     this.peaksContainerRef = React.createRef<HTMLDivElement>();
     this.audioElementRef = React.createRef<HTMLAudioElement>();
-    const audioBlob_ = fetch(props.audioURL).then((r) => r.blob());
-    const audioBuffer_ = audioBlob_.then((blob) =>
-      new Response(blob)
-        .arrayBuffer()
-        .then((buffer) => new OfflineAudioContext(2, 44100 * 40, 44100).decodeAudioData(buffer)),
-    );
+    const { audioBlob } = this.props;
+    const audioBuffer_ = new Response(audioBlob)
+      .arrayBuffer()
+      .then((buffer) => new OfflineAudioContext(2, 44100 * 40, 44100).decodeAudioData(buffer));
     const defaultClassifier = { name: "Default Classifier" };
     const classification_ = Classification.findOne(defaultClassifier).then((c) => {
       return c ? c : Classification.create(defaultClassifier).save();
     });
     const audioFile_ = this.getRecord();
     this.state = {
-      audioBlob_,
       audioBuffer_,
       audioContext: new AudioContext(),
+      audioUrl: URL.createObjectURL(audioBlob),
       audioFile_,
       classification_,
       peaks: null,
@@ -115,7 +88,7 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
   }
 
   public render() {
-    const { peaks } = this.state;
+    const { peaks, audioFile_ } = this.state;
     return (
       <div className="AudioPlayer">
         {peaks && [
@@ -125,7 +98,15 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
           <Button mini key="pause-button" color="secondary" onClick={this.pauseAudio}>
             <Pause />
           </Button>,
-          <Button mini key="download-labels" onClick={() => Label.exportLabels()}>
+          <Button
+            mini
+            key="download-labels"
+            onClick={() =>
+              audioFile_.then(({ id }) =>
+                AudioFile.exportLabels(id).then(() => console.log("Export completed.")),
+              )
+            }
+          >
             <CloudDownload />
           </Button>,
           <Button
@@ -153,7 +134,7 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
         >
           Peaks container
         </div>
-        <audio src={this.props.audioURL} ref={this.audioElementRef} />
+        <audio src={this.state.audioUrl} ref={this.audioElementRef} />
       </div>
     );
   }
@@ -180,7 +161,7 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
     endTime?: number;
     classification: Classification | string;
   }) => {
-    const { peaks, audioFile_, audioBuffer_ } = this.state;
+    const { peaks, audioFile_, audioBuffer_, audioContext } = this.state;
     const classification_ =
       typeof label.classification === "string"
         ? Promise.resolve(this.getClassification(label.classification))
@@ -192,11 +173,8 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
     const peaksSegmentId = Math.random()
       .toString(36)
       .substring(7);
-    const slicedSegment = await Audio.sliceAudioBuffer(
-      await audioBuffer_,
-      label.startTime,
-      endTime,
-    );
+    const audioBuffer = await audioBuffer_;
+    const slicedSegment = await Audio.sliceAudioBuffer(audioBuffer, label.startTime, endTime);
     // DANGEROUS!! Using Node `Buffer` in front-end code so we can save the segment to DB. Will appear as a Uint8Array on client side when queried
     const [audioFile, classification, sampleData] = await Promise.all([
       audioFile_,
@@ -217,8 +195,8 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
       .save()
       .catch((err) => {
         console.error(err);
-        console.info(`Removing segment ${peaksSegmentId} from player`);
         const _removePeakSegment = peaks && peaks.segments.removeById(peaksSegmentId);
+        console.info(`Removing segment ${peaksSegmentId} from player`);
         return Promise.reject(err);
       });
 
@@ -238,10 +216,10 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
   };
 
   private getRecord = async () => {
-    const { audioURL } = this.props;
+    const { filepath } = this.props;
     const props = {
-      dirname: dirname(audioURL),
-      basename: basename(audioURL),
+      dirname: dirname(filepath),
+      basename: basename(filepath),
     };
     return Database.getConnection().then(async (_) => {
       const record = await AudioFile.findOne(props);
@@ -249,13 +227,15 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
     });
   };
 
-  private labelToPeaksSegment = async (l: Label): Promise<Segment> => {
-    return {
-      startTime: l.startTime,
-      endTime: l.endTime,
-      labelText: l.classification.name,
-    };
-  };
+  private labelToPeaksSegment = async ({
+    startTime,
+    endTime,
+    classification,
+  }: Label): Promise<Segment> => ({
+    startTime,
+    endTime,
+    labelText: classification.name,
+  });
 
   private getClassification = async (name: string) => {
     const c = await Classification.findOne({ name });
@@ -275,13 +255,15 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
     const audioBuffer = await this.state.audioBuffer_;
     const audioDuration = audioBuffer.duration - 1; // -1 because total length might be round up
     const randomTimes = [...Array(1000)].map(() => Math.random() * audioDuration);
-    const labels_ = randomTimes.map(async (startTime) => {
-      const classification = classifications[Math.floor(Math.random() * classifications.length)];
-      return this.addLabel({ startTime, classification }).then((label) => {
-        this.addLabelToPeaks(label);
-        return label;
-      });
-    });
+    const labels_ = Promise.all(
+      randomTimes.map(async (startTime) => {
+        const classification = classifications[Math.floor(Math.random() * classifications.length)];
+        return this.addLabel({ startTime, classification }).then((label) => {
+          this.addLabelToPeaks(label);
+          return label;
+        });
+      }),
+    );
 
     return labels_;
   };

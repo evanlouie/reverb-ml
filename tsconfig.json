@@ -8,8 +8,8 @@
     "target": "es6",
     "jsx": "react",
     "esModuleInterop": true,
-    "allowJs": true,
     "emitDecoratorMetadata": true,
-    "experimentalDecorators": true
+    "experimentalDecorators": true,
+    "outDir": "./out"
   }
 }

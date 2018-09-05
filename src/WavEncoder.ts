@@ -1,19 +1,23 @@
 /**
  * TypeScript Conversion of https://github.com/Jam3/audiobuffer-to-wav
+ * @author Evan Louie <evan.louie@microsoft.com> (https://evanlouie.com)
  */
 export class WavEncoder {
-  public static encode(buffer: AudioBuffer, opt: { float32: boolean } = { float32: false }) {
-    const numChannels = buffer.numberOfChannels;
-    const sampleRate = buffer.sampleRate;
-    const format = opt.float32 ? 3 : 1;
+  /**
+   * @param {AudioBuffer} buffer The AudioBuffer to encode
+   * @param {float32: boolean} options If float32 is true, PCM Floating point at 32-bits/sample will be use; defaults to PCM Integer at 16-bits/sample will be used.
+   * @see http://wavefilegem.com/how_wave_files_work.html
+   */
+  public static encode(buffer: AudioBuffer, { float32 } = { float32: false }) {
+    const { numberOfChannels, sampleRate } = buffer;
+    const format = float32 ? 3 : 1;
     const bitDepth = format === 3 ? 32 : 16;
-
-    const result =
-      numChannels === 2
+    const audioData =
+      numberOfChannels === 2
         ? this.interleave(buffer.getChannelData(0), buffer.getChannelData(1))
         : buffer.getChannelData(0);
 
-    return this.encodeWAV(result, format, sampleRate, numChannels, bitDepth);
+    return this.encodeWAV(audioData, format, sampleRate, numberOfChannels, bitDepth);
   }
 
   private static encodeWAV(

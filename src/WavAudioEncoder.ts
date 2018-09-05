@@ -2,14 +2,13 @@
  * TypeScript conversion of https://github.com/higuma/wav-audio-encoder-js
  */
 export class WavAudioEncoder {
-  private static min = Math.min;
-  private static max = Math.max;
-  private static setString = (view: DataView, offset: number, str: string) => {
-    const len = str.length;
-    for (let i = 0; i < len; ++i) {
-      view.setUint8(offset + i, str.charCodeAt(i));
-    }
-  };
+  public static encode(buffer: AudioBuffer): Blob {
+    const { sampleRate, numberOfChannels } = buffer;
+    const encoder = new WavAudioEncoder(sampleRate, numberOfChannels);
+    const float32buffers = [...Array(numberOfChannels)].map((_, i) => buffer.getChannelData(i));
+    encoder.encode(float32buffers);
+    return encoder.finish();
+  }
 
   public sampleRate: number;
   public numChannels: number;
@@ -23,19 +22,15 @@ export class WavAudioEncoder {
     this.dataViews = [];
   }
 
-  public encode(buffer: Float32Array[]) {
-    const len = buffer[0].length;
+  public encode(buffers: Float32Array[]) {
+    const len = buffers[0].length;
     const nCh = this.numChannels;
     const view = new DataView(new ArrayBuffer(len * nCh * 2));
     let offset = 0;
     for (let i = 0; i < len; ++i) {
       for (let ch = 0; ch < nCh; ++ch) {
-        const x = buffer[ch][i] * 0x7fff;
-        view.setInt16(
-          offset,
-          x < 0 ? WavAudioEncoder.max(x, -0x8000) : WavAudioEncoder.min(x, 0x7fff),
-          true,
-        );
+        const x = buffers[ch][i] * 0x7fff;
+        view.setInt16(offset, x < 0 ? Math.max(x, -0x8000) : Math.min(x, 0x7fff), true);
         offset += 2;
       }
     }
@@ -46,10 +41,10 @@ export class WavAudioEncoder {
   public finish(): Blob {
     const dataSize = this.numChannels * this.numSamples * 2;
     const view = new DataView(new ArrayBuffer(44));
-    WavAudioEncoder.setString(view, 0, "RIFF");
+    this.setString(view, 0, "RIFF");
     view.setUint32(4, 36 + dataSize, true);
-    WavAudioEncoder.setString(view, 8, "WAVE");
-    WavAudioEncoder.setString(view, 12, "fmt ");
+    this.setString(view, 8, "WAVE");
+    this.setString(view, 12, "fmt ");
     view.setUint32(16, 16, true);
     view.setUint16(20, 1, true);
     view.setUint16(22, this.numChannels, true);
@@ -57,7 +52,7 @@ export class WavAudioEncoder {
     view.setUint32(28, this.sampleRate * 4, true);
     view.setUint16(32, this.numChannels * 2, true);
     view.setUint16(34, 16, true);
-    WavAudioEncoder.setString(view, 36, "data");
+    this.setString(view, 36, "data");
     view.setUint32(40, dataSize, true);
     this.dataViews.unshift(view);
     const blob = new Blob(this.dataViews, { type: "audio/wav" });
@@ -67,5 +62,12 @@ export class WavAudioEncoder {
 
   private cleanup() {
     delete this.dataViews;
+  }
+
+  private setString(view: DataView, offset: number, str: string) {
+    const len = str.length;
+    for (let i = 0; i < len; ++i) {
+      view.setUint8(offset + i, str.charCodeAt(i));
+    }
   }
 }

@@ -6,7 +6,7 @@ export const selectFiles = (): Promise<string[]> =>
     remote.dialog.showOpenDialog(
       // { properties: ["openFile", "openDirectory", "multiSelections"] },
       { properties: ["openFile", "multiSelections"] },
-      (files) => resolve(files),
+      (files) => resolve(files || []),
     ),
   );
 
@@ -38,8 +38,11 @@ export const selectAudioFiles = (): Promise<string[]> =>
           },
         ],
       },
-      (files) => resolve(files),
+      (files) => resolve(files || []),
     ),
   );
 
+/**
+ * @see https://github.com/electron/electron/blob/master/docs/api/app.md#appgetpathname
+ */
 export const getPath = (name: string): string => remote.app.getPath(name);
