@@ -1,7 +1,6 @@
 import { Button } from "@material-ui/core";
 import { CloudDownload, LabelImportant, Pause, PlayArrowRounded } from "@material-ui/icons";
 import { Buffer } from "buffer";
-import { writeFile } from "fs";
 import { basename, dirname } from "path";
 import PeaksJS, { PeaksInstance, Segment } from "peaks.js";
 import React from "react";
@@ -172,7 +171,7 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
     ];
     const peaksSegmentId = Math.random()
       .toString(36)
-      .substring(7);
+      .substring(2);
     const audioBuffer = await audioBuffer_;
     const slicedSegment = await Audio.sliceAudioBuffer(audioBuffer, label.startTime, endTime);
     // DANGEROUS!! Using Node `Buffer` in front-end code so we can save the segment to DB. Will appear as a Uint8Array on client side when queried
@@ -210,9 +209,9 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
       endTime: l.endTime,
       labelText: l.classification.name,
     }));
-    if (peaks) {
-      peaks.segments.add(segments);
-    }
+    return peaks
+      ? peaks.segments.add(segments) || segments
+      : Promise.reject(new Error(`Failed to add segments to Peaks instance.`));
   };
 
   private getRecord = async () => {
