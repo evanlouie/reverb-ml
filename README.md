@@ -9,6 +9,11 @@ yarn install
 yarn run start
 ```
 
+# Instructions
+
+- Local database saved to your `~/reverb.sqlite3`.
+- Audio samples are saved to `~/reverb-export`.
+
 ## Notes
 
 - As of `"typeorm": "^0.2.7"`, the docs are wrong for lazy loading relations. Even when property type is `Promise<T>` as the docs say, attempting to save the record will fail. (even though their examples says you should be able to do {key: Promise.resolve<T>(value)}) https://github.com/typeorm/typeorm/issues/2276
