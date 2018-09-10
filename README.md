@@ -2,14 +2,14 @@
 
 Status: Don't even attempt to use. It is currently only on GitHub as my personal backup for development.
 
-# Quickstart
+## Quickstart
 
 ```bash
 yarn install
 yarn run start
 ```
 
-# Instructions
+## Instructions
 
 - Local database saved to your `~/reverb.sqlite3`.
 - Audio samples are saved to `~/reverb-export`.
