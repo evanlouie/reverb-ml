@@ -122,7 +122,7 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
             <LabelImportant />
           </Button>,
           <Button mini key="test-data" color="secondary" onClick={() => this.spawnTestData()}>
-            Foo
+            Spawn Test Data
           </Button>,
         ]}
 
