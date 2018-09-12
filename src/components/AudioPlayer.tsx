@@ -1,4 +1,4 @@
-import { Button } from "@material-ui/core";
+import { Button, TextField, Tooltip } from "@material-ui/core";
 import { CloudDownload, LabelImportant, Pause, PlayArrowRounded } from "@material-ui/icons";
 import { Buffer } from "buffer";
 import { basename, dirname } from "path";
@@ -91,37 +91,58 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
     return (
       <div className="AudioPlayer">
         {peaks && [
-          <Button mini key="play-button" color="primary" onClick={this.playAudio}>
-            <PlayArrowRounded />
-          </Button>,
-          <Button mini key="pause-button" color="secondary" onClick={this.pauseAudio}>
-            <Pause />
-          </Button>,
+          <Tooltip title="Play">
+            <Button mini key="play-button" color="primary" onClick={this.playAudio}>
+              <PlayArrowRounded />
+            </Button>
+          </Tooltip>,
+          <Tooltip title="Pause">
+            <Button mini key="pause-button" color="secondary" onClick={this.pauseAudio}>
+              <Pause />
+            </Button>
+          </Tooltip>,
+          <Tooltip title="Download Labels to `~/rever-export`">
+            <Button
+              mini
+              key="download-labels"
+              onClick={() =>
+                audioFile_.then(({ id }) =>
+                  AudioFile.exportLabels(id).then(() => console.log("Export completed.")),
+                )
+              }
+            >
+              <CloudDownload />
+            </Button>
+          </Tooltip>,
+          <TextField
+            required
+            id="label"
+            label="Label"
+            defaultValue="Default Label"
+            margin="normal"
+          />,
+          <Tooltip title="Add Label">
+            <Button
+              mini
+              key="label-button"
+              color="primary"
+              onClick={() =>
+                this.addLabel({
+                  startTime: peaks.player.getCurrentTime(),
+                  classification: "Default Class",
+                })
+              }
+            >
+              <LabelImportant />
+            </Button>
+          </Tooltip>,
           <Button
+            style={{ display: "none" }}
             mini
-            key="download-labels"
-            onClick={() =>
-              audioFile_.then(({ id }) =>
-                AudioFile.exportLabels(id).then(() => console.log("Export completed.")),
-              )
-            }
+            key="test-data"
+            color="secondary"
+            onClick={() => this.spawnTestData()}
           >
-            <CloudDownload />
-          </Button>,
-          <Button
-            mini
-            key="label-button"
-            color="primary"
-            onClick={() =>
-              this.addLabel({
-                startTime: peaks.player.getCurrentTime(),
-                classification: "Default Class",
-              })
-            }
-          >
-            <LabelImportant />
-          </Button>,
-          <Button mini key="test-data" color="secondary" onClick={() => this.spawnTestData()}>
             Spawn Test Data
           </Button>,
         ]}
