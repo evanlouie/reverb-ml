@@ -4,7 +4,7 @@ import { AudioFile } from "../entities/AudioFile";
 import { Classification } from "../entities/Classification";
 import { DataBlob } from "../entities/DataBlob";
 import { Label } from "../entities/Label";
-import { getPath } from "./electron";
+import { getPath } from "./electronHelpers";
 
 export class Database {
   public static async createConnection() {

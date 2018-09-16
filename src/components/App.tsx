@@ -1,6 +1,6 @@
 import { Button, Grid, Typography } from "@material-ui/core";
 import * as React from "react";
-import { selectAudioFiles, selectFiles } from "../lib/electron";
+import { selectAudioFiles, selectFiles } from "../lib/electronHelpers";
 import { Filesystem } from "../lib/Filesystem";
 import { AudioPlayer, IAudioPlayerProps } from "./AudioPlayer";
 
