@@ -16,10 +16,10 @@
   import "reflect-metadata";
   import { AppContainer } from "react-hot-loader";
   //import { createConnection } from "typeorm";
-  import { Database } from "./Database";
+  import { Database } from "./lib/Database";
   
   let render = () => {
-    const { App } = require("./app");
+    const { App } = require("./components/App");
     ReactDOM.render(
       <AppContainer>
         <App />

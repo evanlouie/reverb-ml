@@ -4,13 +4,13 @@ import { Buffer } from "buffer";
 import { basename, dirname } from "path";
 import PeaksJS, { PeaksInstance, Segment } from "peaks.js";
 import React from "react";
-import { Audio } from "../Audio";
-import { Database } from "../Database";
 import { AudioFile } from "../entities/AudioFile";
 import { Classification } from "../entities/Classification";
 import { DataBlob } from "../entities/DataBlob";
 import { Label } from "../entities/Label";
-import { WavEncoder } from "../WavEncoder";
+import { Audio } from "../lib/Audio";
+import { Database } from "../lib/Database";
+import { WavEncoder } from "../lib/WavEncoder";
 
 export interface IAudioPlayerProps {
   audioBlob: Blob;
@@ -88,63 +88,65 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
     const { peaks, audioFile_ } = this.state;
     return (
       <div className="AudioPlayer">
-        {peaks && [
-          <Tooltip title="Play">
-            <Button mini key="play-button" color="primary" onClick={this.playAudio}>
-              <PlayArrowRounded />
-            </Button>
-          </Tooltip>,
-          <Tooltip title="Pause">
-            <Button mini key="pause-button" color="secondary" onClick={this.pauseAudio}>
-              <Pause />
-            </Button>
-          </Tooltip>,
-          <Tooltip title="Download Labels to `~/rever-export`">
+        {peaks && (
+          <div className="toolbar">
+            <Tooltip title="Play">
+              <Button mini key="play-button" color="primary" onClick={this.playAudio}>
+                <PlayArrowRounded />
+              </Button>
+            </Tooltip>
+            <Tooltip title="Pause">
+              <Button mini key="pause-button" color="secondary" onClick={this.pauseAudio}>
+                <Pause />
+              </Button>
+            </Tooltip>
+            <Tooltip title="Download Labels to `~/rever-export`">
+              <Button
+                mini
+                key="download-labels"
+                onClick={() =>
+                  audioFile_.then(({ id }) =>
+                    AudioFile.exportLabels(id).then(() => console.log("Export completed.")),
+                  )
+                }
+              >
+                <CloudDownload />
+              </Button>
+            </Tooltip>
+            <TextField
+              required
+              id="label"
+              label="Label"
+              defaultValue="Default Label"
+              margin="normal"
+              onChange={this.handleLabelChange}
+            />
+            <Tooltip title="Add Label">
+              <Button
+                mini
+                key="label-button"
+                color="primary"
+                onClick={() =>
+                  this.addLabel({
+                    startTime: peaks.player.getCurrentTime(),
+                    classification: this.state.classification,
+                  })
+                }
+              >
+                <LabelImportant />
+              </Button>
+            </Tooltip>
             <Button
+              style={{ display: "none" }}
               mini
-              key="download-labels"
-              onClick={() =>
-                audioFile_.then(({ id }) =>
-                  AudioFile.exportLabels(id).then(() => console.log("Export completed.")),
-                )
-              }
+              key="test-data"
+              color="secondary"
+              onClick={() => this.spawnTestData()}
             >
-              <CloudDownload />
+              Spawn Test Data
             </Button>
-          </Tooltip>,
-          <TextField
-            required
-            id="label"
-            label="Label"
-            defaultValue="Default Label"
-            margin="normal"
-            onChange={this.handleLabelChange}
-          />,
-          <Tooltip title="Add Label">
-            <Button
-              mini
-              key="label-button"
-              color="primary"
-              onClick={() =>
-                this.addLabel({
-                  startTime: peaks.player.getCurrentTime(),
-                  classification: this.state.classification,
-                })
-              }
-            >
-              <LabelImportant />
-            </Button>
-          </Tooltip>,
-          <Button
-            style={{ display: "none" }}
-            mini
-            key="test-data"
-            color="secondary"
-            onClick={() => this.spawnTestData()}
-          >
-            Spawn Test Data
-          </Button>,
-        ]}
+          </div>
+        )}
 
         <div
           className="peaks-container"

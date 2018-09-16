@@ -1,8 +1,8 @@
 import { Button, Grid, Typography } from "@material-ui/core";
 import * as React from "react";
-import { AudioPlayer, IAudioPlayerProps } from "./components/AudioPlayer";
-import { Filesystem } from "./Filesystem";
-import { selectAudioFiles, selectFiles } from "./lib";
+import { selectAudioFiles, selectFiles } from "../lib/electron";
+import { Filesystem } from "../lib/Filesystem";
+import { AudioPlayer, IAudioPlayerProps } from "./AudioPlayer";
 
 interface IAppState {
   audioFiles: IAudioPlayerProps[];
