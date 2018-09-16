@@ -1,3 +1,6 @@
+/**
+ * General Electron helper functions
+ */
 // tslint:disable-next-line
 import { remote } from "electron";
 

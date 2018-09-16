@@ -1,5 +1,4 @@
 import { join } from "path";
-import "reflect-metadata";
 import { Connection, createConnection, getConnection, getConnectionOptions } from "typeorm";
 import { AudioFile } from "../entities/AudioFile";
 import { Classification } from "../entities/Classification";
