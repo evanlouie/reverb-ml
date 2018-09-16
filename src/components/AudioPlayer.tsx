@@ -22,7 +22,7 @@ interface IAudioPlayerState {
   audioBuffer_: Promise<AudioBuffer>;
   audioContext: AudioContext;
   audioFile_: Promise<AudioFile>;
-  classification_: Promise<Classification>;
+  classification: string;
   peaks: PeaksInstance | null;
 }
 
@@ -42,16 +42,14 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
       .arrayBuffer()
       .then((buffer) => new OfflineAudioContext(2, 16000 * 40, 16000).decodeAudioData(buffer)); // two channels at 16000hz
     const defaultClassifier = { name: "Default Classifier" };
-    const classification_ = Classification.findOne(defaultClassifier).then((c) => {
-      return c ? c : Classification.create(defaultClassifier).save();
-    });
+
     const audioFile_ = this.getRecord();
     this.state = {
       audioBuffer_,
       audioContext: new AudioContext(),
       audioUrl: URL.createObjectURL(audioBlob),
       audioFile_,
-      classification_,
+      classification: "Default Classifier",
       peaks: null,
     };
   }
@@ -120,6 +118,7 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
             label="Label"
             defaultValue="Default Label"
             margin="normal"
+            onChange={this.handleLabelChange}
           />,
           <Tooltip title="Add Label">
             <Button
@@ -129,7 +128,7 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
               onClick={() =>
                 this.addLabel({
                   startTime: peaks.player.getCurrentTime(),
-                  classification: "Default Class",
+                  classification: this.state.classification,
                 })
               }
             >
@@ -283,5 +282,9 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
     );
 
     return labels;
+  };
+
+  private handleLabelChange: React.ChangeEventHandler<HTMLInputElement> = ({ target }) => {
+    const _changeState = this.setState({ classification: target.value });
   };
 }
