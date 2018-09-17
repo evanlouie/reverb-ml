@@ -88,14 +88,16 @@ export class App extends React.PureComponent<any, IAppState> {
           >
             Labels
           </Button>
-          <Button
-            color="secondary"
-            onClick={AudioFile.exportAllLabels}
-            fullWidth={true}
-            size="small"
-          >
-            Download All Labels
-          </Button>
+          <Tooltip title="Download all labels to ~/reverb-export">
+            <Button
+              color="secondary"
+              onClick={AudioFile.exportAllLabels}
+              fullWidth={true}
+              size="small"
+            >
+              Download All Labels
+            </Button>
+          </Tooltip>
         </nav>
 
         <main className="main" style={{ gridArea: "main", marginRight: "1em" }}>

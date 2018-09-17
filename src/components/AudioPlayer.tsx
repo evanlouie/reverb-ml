@@ -87,7 +87,8 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
   public render() {
     const { peaks, audioFile_ } = this.state;
     return (
-      <div className="AudioPlayer">
+      // tslint:disable-next-line:jsx-no-lambda
+      <div className="AudioPlayer" onKeyPress={() => console.log("KEY PRESSED")}>
         {peaks && (
           <div className="toolbar">
             <Tooltip title="Play">
@@ -109,7 +110,6 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
               required={true}
               id="label"
               label="Label"
-              defaultValue="Default Label"
               margin="normal"
               onChange={this.handleLabelChange}
             />
