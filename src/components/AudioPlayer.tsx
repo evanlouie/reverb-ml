@@ -91,30 +91,22 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
         {peaks && (
           <div className="toolbar">
             <Tooltip title="Play">
-              <Button mini key="play-button" color="primary" onClick={this.playAudio}>
+              <Button mini={true} key="play-button" color="primary" onClick={this.playAudio}>
                 <PlayArrowRounded />
               </Button>
             </Tooltip>
             <Tooltip title="Pause">
-              <Button mini key="pause-button" color="secondary" onClick={this.pauseAudio}>
+              <Button mini={true} key="pause-button" color="secondary" onClick={this.pauseAudio}>
                 <Pause />
               </Button>
             </Tooltip>
-            <Tooltip title="Download Labels to `~/rever-export`">
-              <Button
-                mini
-                key="download-labels"
-                onClick={() =>
-                  audioFile_.then(({ id }) =>
-                    AudioFile.exportLabels(id).then(() => console.log("Export completed.")),
-                  )
-                }
-              >
+            <Tooltip title="Download Labels to `~/reverb-export`">
+              <Button mini={true} key="download-labels" onClick={this.handleDownloadLabels}>
                 <CloudDownload />
               </Button>
             </Tooltip>
             <TextField
-              required
+              required={true}
               id="label"
               label="Label"
               defaultValue="Default Label"
@@ -122,25 +114,16 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
               onChange={this.handleLabelChange}
             />
             <Tooltip title="Add Label">
-              <Button
-                mini
-                key="label-button"
-                color="primary"
-                onClick={() =>
-                  this.addLabel({
-                    startTime: peaks.player.getCurrentTime(),
-                    classification: this.state.classification,
-                  })
-                }
-              >
+              <Button mini={true} key="label-button" color="primary" onClick={this.handleAddLabel}>
                 <LabelImportant />
               </Button>
             </Tooltip>
             <Button
               style={{ display: "none" }}
-              mini
+              mini={true}
               key="test-data"
               color="secondary"
+              // tslint:disable-next-line:jsx-no-lambda
               onClick={() => this.spawnTestData()}
             >
               Spawn Test Data
@@ -288,5 +271,22 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
 
   private handleLabelChange: React.ChangeEventHandler<HTMLInputElement> = ({ target }) => {
     const _changeState = this.setState({ classification: target.value });
+  };
+
+  private handleDownloadLabels = () =>
+    this.state.audioFile_.then(({ id }) =>
+      AudioFile.exportLabels(id).then(() => console.log("Export completed.")),
+    );
+
+  private handleAddLabel = () => {
+    const { peaks } = this.state;
+    const addedLabel_ = peaks
+      ? this.addLabel({
+          startTime: peaks.player.getCurrentTime(),
+          classification: this.state.classification,
+        })
+      : Promise.reject(new Error("Peaks not initiated"));
+
+    return addedLabel_;
   };
 }

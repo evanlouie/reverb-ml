@@ -1,16 +1,17 @@
-import { Button, Grid, Typography } from "@material-ui/core";
+import { Button, Grid, Tooltip, Typography } from "@material-ui/core";
 import * as React from "react";
 import { selectAudioFiles, selectFiles } from "../lib/electronHelpers";
 import { Filesystem } from "../lib/Filesystem";
 import { AudioPlayer, IAudioPlayerProps } from "./AudioPlayer";
+import { Header } from "./Header";
 
 interface IAppState {
   audioFiles: IAudioPlayerProps[];
 }
 
 const player = (props: IAudioPlayerProps) => (
-  <Grid item xs={12} key={props.filepath}>
-    <Typography variant="title" gutterBottom>
+  <Grid item={true} xs={12} key={props.filepath}>
+    <Typography variant="title" gutterBottom={true}>
       {props.filepath}
     </Typography>
     <AudioPlayer {...props} />
@@ -42,30 +43,58 @@ export class App extends React.PureComponent<any, IAppState> {
   public render() {
     const { audioFiles } = this.state;
     return (
-      <div className="App" style={{ padding: 12 }}>
-        <Grid container spacing={24}>
-          <Grid item xs={12}>
-            <Typography variant="display1" gutterBottom>
-              ReverbML
-            </Typography>
-          </Grid>
-          <Grid container>
-            <Grid item xs={4}>
-              <Button color="primary" onClick={this.selectAudio}>
-                File searcher
-              </Button>
-            </Grid>
-          </Grid>
-          <Grid container>
-            {audioFiles.length === 0 ? (
-              <Grid item xs={12}>
-                <Typography variant="body1">Select audio file before to begin labelling</Typography>
-              </Grid>
-            ) : (
-              audioFiles.map(player)
-            )}
-          </Grid>
-        </Grid>
+      <div
+        className="App"
+        style={{
+          height: "100vh",
+          width: "100vw",
+          display: "grid",
+          gridGap: "1em",
+          gridTemplateColumns: "2fr 10fr",
+          gridTemplateRows: "1fr 11fr",
+          gridTemplateAreas: `"header header" "sidebar main"`,
+        }}
+      >
+        <header className="header" style={{ gridArea: "header" }}>
+          <Header />
+        </header>
+
+        <nav
+          className="sidebar"
+          style={{ gridArea: "sidebar", borderRight: "1px lightgrey solid" }}
+        >
+          <Tooltip title="Browse filesystem for valid audio files">
+            <Button color="primary" onClick={this.selectAudio} fullWidth={true} size="small">
+              Label Audio File
+            </Button>
+          </Tooltip>
+          <Button
+            color="secondary"
+            onClick={this.selectAudio}
+            fullWidth={true}
+            size="small"
+            disabled={true}
+          >
+            Classifications
+          </Button>
+          <Button
+            color="secondary"
+            onClick={this.selectAudio}
+            fullWidth={true}
+            size="small"
+            disabled={true}
+          >
+            Labels
+          </Button>
+        </nav>
+
+        <main className="main" style={{ gridArea: "main", marginRight: "1em" }}>
+          {audioFiles.length === 0 ? (
+            <Typography variant="body1">Select audio file before to begin labelling</Typography>
+          ) : (
+            audioFiles.map(player)
+          )}
+        </main>
       </div>
     );
   }
