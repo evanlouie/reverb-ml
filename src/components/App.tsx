@@ -1,6 +1,7 @@
 import { Button, Grid, Tooltip, Typography } from "@material-ui/core";
-import * as React from "react";
-import { selectAudioFiles, selectFiles } from "../lib/electronHelpers";
+import React from "react";
+import { AudioFile } from "../entities/AudioFile";
+import { selectAudioFiles } from "../lib/electronHelpers";
 import { Filesystem } from "../lib/Filesystem";
 import { AudioPlayer, IAudioPlayerProps } from "./AudioPlayer";
 import { Header } from "./Header";
@@ -37,6 +38,7 @@ export class App extends React.PureComponent<any, IAppState> {
         };
       }),
     );
+
     this.setState({ audioFiles });
   };
 
@@ -85,6 +87,14 @@ export class App extends React.PureComponent<any, IAppState> {
             disabled={true}
           >
             Labels
+          </Button>
+          <Button
+            color="secondary"
+            onClick={AudioFile.exportAllLabels}
+            fullWidth={true}
+            size="small"
+          >
+            Download All Labels
           </Button>
         </nav>
 
