@@ -195,6 +195,9 @@ declare module "wavesurfer.js/dist/plugin/wavesurfer.regions.js" {
     "region-dblclick": (r: Region) => void;
   }
 
+  /**
+   * Methods added to core WaveSurfer instance when regions plugin initialized
+   */
   interface WaveSurferRegions {
     addRegion(options: RegionInitializationProps): void;
     clearRegions(): void;

@@ -43,6 +43,7 @@ interface IAudioPlayerState {
   audioFile_: Promise<AudioFile>;
   classification: string;
   wavesurfer?: WaveSurferInstance & WaveSurferRegions;
+  zoom: number;
 }
 
 export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPlayerState> {
@@ -65,6 +66,7 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
     audioUrl: URL.createObjectURL(this.props.audioBlob),
     audioFile_: AudioPlayer.getRecord(this.props.filepath),
     classification: "default",
+    zoom: 50,
   };
 
   /**
@@ -79,7 +81,7 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
    */
   public async componentDidMount() {
     const { stringToHexColour, hexToRGB, randomColour } = Colour;
-    const { audioFile_ } = this.state;
+    const { audioFile_, zoom: minPxPerSec } = this.state;
     const audioFile = await audioFile_;
     const labels = await audioFile.getLabels();
     const regions = labels.map(
@@ -95,7 +97,7 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
       progressColor: "purple",
       scrollParent: true,
       hideScrollbar: false,
-      minPxPerSec: 50,
+      minPxPerSec,
       plugins: [
         TimelinePlugin.create({ container: this.timelineRef.current as HTMLDivElement }),
         MinimapPlugin.create(),
@@ -104,6 +106,7 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
     }) as WaveSurferInstance & WaveSurferRegions;
     (({ audioUrl } = this.state, w = wavesurfer) => w.load(audioUrl))();
     this.setState({ wavesurfer });
+    window.wavesurfer = wavesurfer;
   }
 
   /**
@@ -122,17 +125,17 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
         {wavesurfer && (
           <div className="toolbar">
             <Tooltip title="Play">
-              <Button mini={true} key="play-button" color="primary" onClick={this.playAudio}>
+              <Button mini={true} color="primary" onClick={this.playAudio}>
                 <PlayArrowRounded />
               </Button>
             </Tooltip>
             <Tooltip title="Pause">
-              <Button mini={true} key="pause-button" color="secondary" onClick={this.pauseAudio}>
+              <Button mini={true} color="secondary" onClick={this.pauseAudio}>
                 <Pause />
               </Button>
             </Tooltip>
-            <Tooltip title="Download Labels to `~/reverb-export`">
-              <Button mini={true} key="download-labels" onClick={this.handleDownloadLabels}>
+            <Tooltip title={`Export labels for ${this.props.filepath} to '~/reverb-export'`}>
+              <Button mini={true} onClick={this.handleDownloadLabels}>
                 <CloudDownload />
               </Button>
             </Tooltip>
@@ -155,7 +158,7 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
             </Tooltip>
             <Tooltip title="Zoom Out">
               <Button mini={true} color="secondary" onClick={this.handleZoomOut}>
-                <ZoomIn />
+                <ZoomOut />
               </Button>
             </Tooltip>
             <Tooltip title="(Re)generate Spectrogram; Warning! CPU intensive. Not recommended for > 4 minute files. Window may appear to freeze while computing.">
@@ -305,27 +308,46 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
         ? Promise.reject(new Error("Wavesurfer not initiated"))
         : this.addLabel({ startTime: surfer.getCurrentTime(), classification }))();
 
-  private handleZoomIn = async () => (({ wavesurfer: ws } = this.state) => ws && ws.zoom(100))();
-  private handleZoomOut = async () => (({ wavesurfer: ws } = this.state) => ws && ws.zoom(0))();
+  private handleZoomIn = async () => {
+    const { wavesurfer: ws, zoom } = this.state;
+    const zoomedIn = zoom + 20;
+    return !ws
+      ? Promise.reject(new Error("WaveSurfer not initialized"))
+      : (() => {
+          ws.zoom(zoomedIn);
+          this.setState({ zoom: zoomedIn });
+        })();
+  };
+
+  private handleZoomOut = async () => {
+    const { wavesurfer: ws, zoom } = this.state;
+    const zoomedOut = zoom >= 20 ? zoom - 20 : 0;
+    return !ws
+      ? Promise.reject(new Error("Wavesurfer not initialized"))
+      : (() => {
+          ws.zoom(zoomedOut);
+          this.setState({ zoom: zoomedOut });
+        })();
+  };
 
   /**
    * @see https://wavesurfer-js.org/v2/changes.html
    */
-  private generateSpectrogram = async () =>
-    (({ wavesurfer: surfer } = this.state) =>
-      typeof surfer === "undefined"
-        ? Promise.reject(new Error("Wavesurfer not initiated"))
-        : (() => {
-            Object.keys(surfer.initialisedPluginList)
-              .filter((plugin) => plugin === "spectrogram")
-              .forEach(surfer.destroyPlugin);
-            surfer
-              .addPlugin(
-                SpectrogramPlugin.create({
-                  container: this.spectrogramRef.current as HTMLDivElement,
-                  labels: true,
-                }),
-              )
-              .initPlugin("spectrogram");
-          })())();
+  private generateSpectrogram = async () => {
+    const { wavesurfer: ws } = this.state;
+    return !ws
+      ? Promise.reject(new Error("Wavesurfer not initiated"))
+      : (() => {
+          if (Object.keys(ws.initialisedPluginList).indexOf("spectrogram") > -1) {
+            ws.destroyPlugin("spectrogram");
+          }
+          ws.addPlugin(
+            SpectrogramPlugin.create({
+              container: this.spectrogramRef.current as HTMLDivElement,
+              labels: true,
+            }),
+          );
+          ws.initPlugin("spectrogram");
+        })();
+  };
 }

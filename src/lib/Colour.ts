@@ -1,4 +1,8 @@
 export class Colour {
+  /**
+   * Convert any random string to a distinct 6 digit hex color string
+   * @returns {string} of format `#000000`
+   */
   public static stringToHexColour = (str: string) => {
     let hash = 0;
     for (let i = 0; i < str.length; i++) {
@@ -14,6 +18,9 @@ export class Colour {
     return colour;
   };
 
+  /**
+   * Convert hex colour string to an RGB map
+   */
   public static hexToRGB = (hex: string) => {
     const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
     if (result) {
@@ -26,6 +33,9 @@ export class Colour {
     throw new Error("Invalid Hex color string provided");
   };
 
+  /**
+   * Generate an HTML usable rgba()
+   */
   public static randomColour = ({
     red = Math.floor(Math.random() * 256),
     green = Math.floor(Math.random() * 256),
