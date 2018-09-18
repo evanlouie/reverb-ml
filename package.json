@@ -59,13 +59,13 @@
     "electron-devtools-installer": "^2.1.0",
     "electron-squirrel-startup": "^1.0.0",
     "fs-extra": "^7.0.0",
-    "peaks.js": "^0.9.13",
     "react": "^16.5.0",
     "react-dom": "^16.5.0",
     "react-hot-loader": "^4.3.6",
     "reflect-metadata": "^0.1.12",
     "sqlite3": "^4.0.2",
-    "typeorm": "^0.2.7"
+    "typeorm": "^0.2.7",
+    "wavesurfer.js": "^2.0.6"
   },
   "devDependencies": {
     "@types/node": "^10.9.4",

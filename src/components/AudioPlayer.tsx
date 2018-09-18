@@ -1,8 +1,15 @@
 import { Button, TextField, Tooltip } from "@material-ui/core";
-import { CloudDownload, LabelImportant, Pause, PlayArrowRounded } from "@material-ui/icons";
+import {
+  CloudDownload,
+  GraphicEq,
+  LabelImportant,
+  Pause,
+  PlayArrowRounded,
+  ZoomIn,
+  ZoomOut,
+} from "@material-ui/icons";
 import { Buffer } from "buffer";
 import { basename, dirname } from "path";
-import PeaksJS, { PeaksInstance, Segment } from "peaks.js";
 import React from "react";
 import { AudioFile } from "../entities/AudioFile";
 import { Classification } from "../entities/Classification";
@@ -11,6 +18,17 @@ import { Label } from "../entities/Label";
 import { Audio } from "../lib/Audio";
 import { Database } from "../lib/Database";
 import { WavEncoder } from "../lib/WavEncoder";
+
+// WaveSurfer
+import WaveSurfer, { WaveSurferInstance } from "wavesurfer.js";
+// tslint:disable-next-line:no-submodule-imports
+import MinimapPlugin from "wavesurfer.js/dist/plugin/wavesurfer.minimap.js";
+// tslint:disable-next-line:no-submodule-imports
+import RegionsPlugin, { WaveSurferRegions } from "wavesurfer.js/dist/plugin/wavesurfer.regions.js";
+// tslint:disable-next-line:no-submodule-imports
+import SpectrogramPlugin from "wavesurfer.js/dist/plugin/wavesurfer.spectrogram.js";
+// tslint:disable-next-line:no-submodule-imports
+import TimelinePlugin from "wavesurfer.js/dist/plugin/wavesurfer.timeline.js";
 
 export interface IAudioPlayerProps {
   audioBlob: Blob;
@@ -23,73 +41,85 @@ interface IAudioPlayerState {
   audioContext: AudioContext;
   audioFile_: Promise<AudioFile>;
   classification: string;
-  peaks: PeaksInstance | null;
+  wavesurfer?: WaveSurferInstance & WaveSurferRegions;
 }
 
 export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPlayerState> {
-  /**
-   * DOM refs to keep track of elements for Peaks to mount
-   */
-  private peaksContainerRef: React.RefObject<HTMLDivElement>;
-  private audioElementRef: React.RefObject<HTMLAudioElement>;
-
-  constructor(props: IAudioPlayerProps) {
-    super(props);
-    this.peaksContainerRef = React.createRef<HTMLDivElement>();
-    this.audioElementRef = React.createRef<HTMLAudioElement>();
-    const { audioBlob } = this.props;
-    const audioBuffer_ = new Response(audioBlob)
-      .arrayBuffer()
-      .then((buffer) => new OfflineAudioContext(2, 16000 * 40, 16000).decodeAudioData(buffer)); // two channels at 16000hz
-    const defaultClassifier = { name: "Default Classifier" };
-
-    const audioFile_ = this.getRecord();
-    this.state = {
-      audioBuffer_,
-      audioContext: new AudioContext(),
-      audioUrl: URL.createObjectURL(audioBlob),
-      audioFile_,
-      classification: "Default Classifier",
-      peaks: null,
+  private static async getRecord(filepath: string): Promise<AudioFile> {
+    const props = {
+      dirname: dirname(filepath),
+      basename: basename(filepath),
     };
+    return Database.getConnection().then(async (_) => {
+      const record = await AudioFile.findOne(props);
+      return record ? record : AudioFile.create(props).save();
+    });
   }
+
+  public state: IAudioPlayerState = {
+    audioBuffer_: new Response(this.props.audioBlob)
+      .arrayBuffer()
+      .then((buffer) => new OfflineAudioContext(2, 16000 * 40, 16000).decodeAudioData(buffer)), // two channels at 16000hz
+    audioContext: new AudioContext(),
+    audioUrl: URL.createObjectURL(this.props.audioBlob),
+    audioFile_: AudioPlayer.getRecord(this.props.filepath),
+    classification: "default",
+  };
+
+  /**
+   * DOM refs to keep track of elements for WaveSurfer to mount
+   */
+  private wavesurferContainerRef = React.createRef<HTMLDivElement>();
+  private timelineRef = React.createRef<HTMLDivElement>();
+  private spectrogramRef = React.createRef<HTMLDivElement>();
 
   /**
    * On initial mount, initialize PeaksJS into DOM
    */
   public async componentDidMount() {
+    const randomColor = (gradient = 0.5) =>
+      `rgba(${Math.floor(Math.random() * 256)},${Math.floor(Math.random() * 256)},${Math.floor(
+        Math.random() * 256,
+      )}, ${gradient})`;
     const { audioFile_ } = this.state;
-    const [peaksDiv, audioTag] = [this.peaksContainerRef.current, this.audioElementRef.current];
     const audioFile = await audioFile_;
     const labels = await audioFile.getLabels();
-    const segments = await Promise.all(labels.map(this.labelToPeaksSegment));
-    const peaks = await (peaksDiv && audioTag
-      ? PeaksJS.init({
-          container: this.peaksContainerRef.current as HTMLDivElement,
-          mediaElement: this.audioElementRef.current as HTMLAudioElement,
-          audioContext: this.state.audioContext,
-          segments,
-        })
-      : Promise.reject(
-          new Error("Failed to initialize Peaks; Container or AudioElement refs are set to null."),
-        ));
-    this.setState({ peaks });
+    const regions = labels.map(({ startTime: start, endTime: end }) => ({
+      start,
+      end,
+      color: randomColor(),
+    }));
+    const wavesurfer = WaveSurfer.create({
+      container: this.wavesurferContainerRef.current as HTMLDivElement,
+      waveColor: "violet",
+      progressColor: "purple",
+      scrollParent: true,
+      hideScrollbar: false,
+      minPxPerSec: 50,
+      plugins: [
+        TimelinePlugin.create({ container: this.timelineRef.current as HTMLDivElement }),
+        MinimapPlugin.create(),
+        RegionsPlugin.create({ dragSelection: true, regions }),
+      ],
+    }) as WaveSurferInstance & WaveSurferRegions;
+    (({ audioUrl } = this.state, w = wavesurfer) => w.load(audioUrl))();
+    this.setState({ wavesurfer });
   }
 
   /**
    * Ensure Peaks is destroyed before unmounting (memory leaks).
    */
   public async componentWillUnmount() {
-    const { audioContext, peaks } = this.state;
-    const _cleanupAudio = await Promise.all([audioContext.close(), peaks && peaks.destroy()]);
+    (({ wavesurfer: w } = this.state) => w && w.destroy())();
   }
 
   public render() {
-    const { peaks, audioFile_ } = this.state;
+    const { wavesurfer } = this.state;
+    const maxWidthRefStyles = { width: "100%", minWidth: "20vw" };
     return (
       // tslint:disable-next-line:jsx-no-lambda
       <div className="AudioPlayer" onKeyPress={() => console.log("KEY PRESSED")}>
-        {peaks && (
+        {wavesurfer && (
           <div className="toolbar">
             <Tooltip title="Play">
               <Button mini={true} key="play-button" color="primary" onClick={this.playAudio}>
@@ -114,8 +144,23 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
               onChange={this.handleLabelChange}
             />
             <Tooltip title="Add Label">
-              <Button mini={true} key="label-button" color="primary" onClick={this.handleAddLabel}>
+              <Button mini={true} color="primary" onClick={this.handleAddLabel}>
                 <LabelImportant />
+              </Button>
+            </Tooltip>
+            <Tooltip title="Zoom In">
+              <Button mini={true} color="primary" onClick={this.handleZoomIn}>
+                <ZoomIn />
+              </Button>
+            </Tooltip>
+            <Tooltip title="Zoom Out">
+              <Button mini={true} color="secondary" onClick={this.handleZoomOut}>
+                <ZoomIn />
+              </Button>
+            </Tooltip>
+            <Tooltip title="(Re)generate Spectrogram; Warning! CPU intensive. Not recommended for > 4 minute files. Window may appear to freeze while computing.">
+              <Button mini={true} color="secondary" onClick={this.generateSpectrogram}>
+                <GraphicEq />
               </Button>
             </Tooltip>
             <Button
@@ -123,22 +168,16 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
               mini={true}
               key="test-data"
               color="secondary"
-              // tslint:disable-next-line:jsx-no-lambda
-              onClick={() => this.spawnTestData()}
+              onClick={this.spawnTestData}
             >
               Spawn Test Data
             </Button>
           </div>
         )}
 
-        <div
-          className="peaks-container"
-          ref={this.peaksContainerRef}
-          style={{ width: "100%", minWidth: "20vw" }}
-        >
-          Peaks container
-        </div>
-        <audio src={this.state.audioUrl} ref={this.audioElementRef} />
+        <div ref={this.wavesurferContainerRef} style={maxWidthRefStyles} />
+        <div ref={this.timelineRef} style={maxWidthRefStyles} />
+        <div ref={this.spectrogramRef} style={maxWidthRefStyles} />
       </div>
     );
   }
@@ -147,17 +186,21 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
   // Helpers
   ////////////////////////////////////////////////////////////////////////////////
   private playAudio = async () => {
-    const { peaks } = this.state;
-    return peaks
-      ? peaks.player.play()
-      : Promise.reject(new Error(`Failed to call play() on peaks instance; instance: ${peaks}`));
+    const { wavesurfer } = this.state;
+    return wavesurfer
+      ? wavesurfer.play()
+      : Promise.reject(
+          new Error(`Failed to call play() on wavesurfer instance; instance: ${wavesurfer}`),
+        );
   };
 
   private pauseAudio = async () => {
-    const { peaks } = this.state;
-    return peaks
-      ? peaks.player.pause()
-      : Promise.reject(new Error(`Failed to call pause() on peaks instance; instance: ${peaks}`));
+    const { wavesurfer } = this.state;
+    return wavesurfer
+      ? wavesurfer.pause()
+      : Promise.reject(
+          new Error(`Failed to call pause() on wavesurfer instance; instance: ${wavesurfer}`),
+        );
   };
 
   private addLabel = async (label: {
@@ -165,7 +208,7 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
     endTime?: number;
     classification: Classification | string;
   }) => {
-    const { peaks, audioFile_, audioBuffer_, audioContext } = this.state;
+    const { wavesurfer, audioFile_, audioBuffer_, audioContext } = this.state;
     const classification_ =
       typeof label.classification === "string"
         ? Promise.resolve(this.getClassification(label.classification))
@@ -187,8 +230,8 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
         blob: Buffer.from(WavEncoder.encode(slicedSegment)),
       }).save(),
     ]);
-    const peaksSegment = { id: peaksSegmentId, startTime, endTime, labelText: classification.name };
-    const _addPeaksSegment = peaks && peaks.segments.add(peaksSegment);
+    const wavesurferRegion = { start: startTime, end: endTime };
+    ((w = wavesurfer) => w && w.addRegion(wavesurferRegion))();
     const savedLabel = Label.create({
       startTime,
       endTime,
@@ -199,7 +242,12 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
       .save()
       .catch((err) => {
         console.error(err);
-        const _removePeakSegment = peaks && peaks.segments.removeById(peaksSegmentId);
+        const region =
+          wavesurfer &&
+          wavesurfer.regions.find(({ start, end }) => start === startTime && end === endTime);
+        if (region) {
+          region.remove();
+        }
         console.info(`Removing segment ${peaksSegmentId} from player`);
         return Promise.reject(err);
       });
@@ -208,38 +256,15 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
   };
 
   private addLabelToPeaks = async (...labels: Label[]) => {
-    const { peaks } = this.state;
-    const segments = labels.map((l) => ({
-      startTime: l.startTime,
-      endTime: l.endTime,
-      labelText: l.classification.name,
+    const { wavesurfer } = this.state;
+    const regions = labels.map(({ startTime: start, endTime: end }) => ({
+      start,
+      end,
     }));
-    return peaks
-      ? peaks.segments.add(segments) || segments
+    return wavesurfer
+      ? regions.map(wavesurfer.addRegion) || regions
       : Promise.reject(new Error(`Failed to add segments to Peaks instance.`));
   };
-
-  private getRecord = async () => {
-    const { filepath } = this.props;
-    const props = {
-      dirname: dirname(filepath),
-      basename: basename(filepath),
-    };
-    return Database.getConnection().then(async (_) => {
-      const record = await AudioFile.findOne(props);
-      return record ? record : AudioFile.create(props).save();
-    });
-  };
-
-  private labelToPeaksSegment = async ({
-    startTime,
-    endTime,
-    classification,
-  }: Label): Promise<Segment> => ({
-    startTime,
-    endTime,
-    labelText: classification.name,
-  });
 
   private getClassification = async (name: string) => {
     const c = await Classification.findOne({ name });
@@ -269,24 +294,42 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
     return labels;
   };
 
-  private handleLabelChange: React.ChangeEventHandler<HTMLInputElement> = ({ target }) => {
-    const _changeState = this.setState({ classification: target.value });
-  };
+  private handleLabelChange: React.ChangeEventHandler<HTMLInputElement> = async ({ target }) =>
+    this.setState({ classification: target.value });
 
-  private handleDownloadLabels = () =>
-    this.state.audioFile_.then(({ id }) =>
-      AudioFile.exportLabels(id).then(() => console.log("Export completed.")),
-    );
+  private handleDownloadLabels = async () =>
+    (({ audioFile_ } = this.state) =>
+      audioFile_
+        .then(({ id }) => AudioFile.exportLabels(id))
+        .then(() => console.log("Export Complete")))();
 
-  private handleAddLabel = () => {
-    const { peaks } = this.state;
-    const addedLabel_ = peaks
-      ? this.addLabel({
-          startTime: peaks.player.getCurrentTime(),
-          classification: this.state.classification,
-        })
-      : Promise.reject(new Error("Peaks not initiated"));
+  private handleAddLabel = async () =>
+    (({ wavesurfer: surfer, classification } = this.state) =>
+      !surfer
+        ? Promise.reject(new Error("Wavesurfer not initiated"))
+        : this.addLabel({ startTime: surfer.getCurrentTime(), classification }))();
 
-    return addedLabel_;
-  };
+  private handleZoomIn = async () => (({ wavesurfer: ws } = this.state) => ws && ws.zoom(100))();
+  private handleZoomOut = async () => (({ wavesurfer: ws } = this.state) => ws && ws.zoom(0))();
+
+  /**
+   * @see https://wavesurfer-js.org/v2/changes.html
+   */
+  private generateSpectrogram = async () =>
+    (({ wavesurfer: surfer } = this.state) =>
+      !surfer
+        ? Promise.reject(new Error("Wavesurfer not initiated"))
+        : (() => {
+            Object.keys(surfer.initialisedPluginList)
+              .filter((plugin) => plugin === "spectrogram")
+              .forEach(surfer.destroyPlugin);
+            surfer
+              .addPlugin(
+                SpectrogramPlugin.create({
+                  container: this.spectrogramRef.current as HTMLDivElement,
+                  labels: true,
+                }),
+              )
+              .initPlugin("spectrogram");
+          })())();
 }
