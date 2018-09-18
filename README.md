@@ -25,5 +25,5 @@ yarn run start
 ## Code Style guide
 
 - `.tsx?` files which start with a capital do a named class export of the same filename; other files are considered lib files and can export anything.
-- Variables **prefixed** with `_` are `do` style operations.
+- `do` style operations are within IIFE.
 - Variables **suffixed** with `_` are of type `Promise<T>` or some unresolved type.

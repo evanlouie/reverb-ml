@@ -29,6 +29,7 @@ import RegionsPlugin, { WaveSurferRegions } from "wavesurfer.js/dist/plugin/wave
 import SpectrogramPlugin from "wavesurfer.js/dist/plugin/wavesurfer.spectrogram.js";
 // tslint:disable-next-line:no-submodule-imports
 import TimelinePlugin from "wavesurfer.js/dist/plugin/wavesurfer.timeline.js";
+import { Colour } from "../lib/Colour";
 
 export interface IAudioPlayerProps {
   audioBlob: Blob;
@@ -77,18 +78,17 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
    * On initial mount, initialize PeaksJS into DOM
    */
   public async componentDidMount() {
-    const randomColor = (gradient = 0.5) =>
-      `rgba(${Math.floor(Math.random() * 256)},${Math.floor(Math.random() * 256)},${Math.floor(
-        Math.random() * 256,
-      )}, ${gradient})`;
+    const { stringToHexColour, hexToRGB, randomColour } = Colour;
     const { audioFile_ } = this.state;
     const audioFile = await audioFile_;
     const labels = await audioFile.getLabels();
-    const regions = labels.map(({ startTime: start, endTime: end }) => ({
-      start,
-      end,
-      color: randomColor(),
-    }));
+    const regions = labels.map(
+      ({ startTime: start, endTime: end, classification: { name: labelName } }) => ({
+        start,
+        end,
+        color: randomColour(hexToRGB(stringToHexColour(labelName))),
+      }),
+    );
     const wavesurfer = WaveSurfer.create({
       container: this.wavesurferContainerRef.current as HTMLDivElement,
       waveColor: "violet",
@@ -245,9 +245,7 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
         const region =
           wavesurfer &&
           wavesurfer.regions.find(({ start, end }) => start === startTime && end === endTime);
-        if (region) {
-          region.remove();
-        }
+        ((r = region) => r && r.remove())();
         console.info(`Removing segment ${peaksSegmentId} from player`);
         return Promise.reject(err);
       });
@@ -266,10 +264,8 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
       : Promise.reject(new Error(`Failed to add segments to Peaks instance.`));
   };
 
-  private getClassification = async (name: string) => {
-    const c = await Classification.findOne({ name });
-    return c || Classification.create({ name }).save();
-  };
+  private getClassification = async (name: string) =>
+    Classification.findOne({ name }).then((c) => c || Classification.create({ name }).save());
 
   private spawnTestData = async () => {
     const classifications = await Promise.all(
@@ -305,7 +301,7 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
 
   private handleAddLabel = async () =>
     (({ wavesurfer: surfer, classification } = this.state) =>
-      !surfer
+      typeof surfer === "undefined"
         ? Promise.reject(new Error("Wavesurfer not initiated"))
         : this.addLabel({ startTime: surfer.getCurrentTime(), classification }))();
 
@@ -317,7 +313,7 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
    */
   private generateSpectrogram = async () =>
     (({ wavesurfer: surfer } = this.state) =>
-      !surfer
+      typeof surfer === "undefined"
         ? Promise.reject(new Error("Wavesurfer not initiated"))
         : (() => {
             Object.keys(surfer.initialisedPluginList)
