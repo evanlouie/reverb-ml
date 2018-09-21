@@ -1,4 +1,4 @@
-import { Button, TextField, Tooltip } from "@material-ui/core";
+import { Button, Paper, TextField, Tooltip } from "@material-ui/core";
 import {
   CloudDownload,
   GraphicEq,
@@ -11,25 +11,23 @@ import {
 import { Buffer } from "buffer";
 import { basename, dirname } from "path";
 import React from "react";
+import WaveSurfer, { WaveSurferInstance } from "wavesurfer.js";
+import MinimapPlugin from "wavesurfer.js/dist/plugin/wavesurfer.minimap.js";
+import RegionsPlugin, {
+  Region,
+  WaveSurferRegions,
+} from "wavesurfer.js/dist/plugin/wavesurfer.regions.js";
+import SpectrogramPlugin from "wavesurfer.js/dist/plugin/wavesurfer.spectrogram.js";
+import TimelinePlugin from "wavesurfer.js/dist/plugin/wavesurfer.timeline.js";
 import { AudioFile } from "../entities/AudioFile";
 import { Classification } from "../entities/Classification";
 import { DataBlob } from "../entities/DataBlob";
 import { Label } from "../entities/Label";
 import { Audio } from "../lib/Audio";
+import { stringToRGBA } from "../lib/colour";
 import { Database } from "../lib/Database";
 import { WavEncoder } from "../lib/WavEncoder";
-
-// WaveSurfer
-import WaveSurfer, { WaveSurferInstance } from "wavesurfer.js";
-// tslint:disable-next-line:no-submodule-imports
-import MinimapPlugin from "wavesurfer.js/dist/plugin/wavesurfer.minimap.js";
-// tslint:disable-next-line:no-submodule-imports
-import RegionsPlugin, { WaveSurferRegions } from "wavesurfer.js/dist/plugin/wavesurfer.regions.js";
-// tslint:disable-next-line:no-submodule-imports
-import SpectrogramPlugin from "wavesurfer.js/dist/plugin/wavesurfer.spectrogram.js";
-// tslint:disable-next-line:no-submodule-imports
-import TimelinePlugin from "wavesurfer.js/dist/plugin/wavesurfer.timeline.js";
-import { Colour } from "../lib/Colour";
+import { LabelTable } from "./LabelTable";
 
 export interface IAudioPlayerProps {
   audioBlob: Blob;
@@ -39,9 +37,9 @@ export interface IAudioPlayerProps {
 interface IAudioPlayerState {
   audioUrl: string;
   audioBuffer_: Promise<AudioBuffer>;
-  audioContext: AudioContext;
   audioFile_: Promise<AudioFile>;
   classification: string;
+  labels: Label[];
   wavesurfer?: WaveSurferInstance & WaveSurferRegions;
   zoom: number;
 }
@@ -62,10 +60,10 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
     audioBuffer_: new Response(this.props.audioBlob)
       .arrayBuffer()
       .then((buffer) => new OfflineAudioContext(2, 16000 * 40, 16000).decodeAudioData(buffer)), // two channels at 16000hz
-    audioContext: new AudioContext(),
     audioUrl: URL.createObjectURL(this.props.audioBlob),
     audioFile_: AudioPlayer.getRecord(this.props.filepath),
     classification: "default",
+    labels: [],
     zoom: 50,
   };
 
@@ -80,15 +78,14 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
    * On initial mount, initialize PeaksJS into DOM
    */
   public async componentDidMount() {
-    const { stringToHexColour, hexToRGB, randomColour } = Colour;
-    const { audioFile_, zoom: minPxPerSec } = this.state;
+    const { audioFile_, zoom: minPxPerSec, audioUrl, audioBuffer_ } = this.state;
     const audioFile = await audioFile_;
     const labels = await audioFile.getLabels();
     const regions = labels.map(
       ({ startTime: start, endTime: end, classification: { name: labelName } }) => ({
         start,
         end,
-        color: randomColour(hexToRGB(stringToHexColour(labelName))),
+        color: stringToRGBA(labelName),
       }),
     );
     const wavesurfer = WaveSurfer.create({
@@ -104,8 +101,15 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
         RegionsPlugin.create({ dragSelection: true, regions }),
       ],
     }) as WaveSurferInstance & WaveSurferRegions;
-    (({ audioUrl } = this.state, w = wavesurfer) => w.load(audioUrl))();
-    this.setState({ wavesurfer });
+
+    // Only after ready we should bind region handlers to avoid duplicating already create labels
+    wavesurfer.on("ready", () => {
+      console.info("Wavesurfer ready");
+      wavesurfer.on("region-created", this.handleWavesurferRegionCreate);
+    });
+    wavesurfer.load(audioUrl);
+    this.setState({ wavesurfer, labels });
+
     window.wavesurfer = wavesurfer;
   }
 
@@ -122,65 +126,88 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
     return (
       // tslint:disable-next-line:jsx-no-lambda
       <div className="AudioPlayer" onKeyPress={() => console.log("KEY PRESSED")}>
-        {wavesurfer && (
-          <div className="toolbar">
-            <Tooltip title="Play">
-              <Button mini={true} color="primary" onClick={this.playAudio}>
-                <PlayArrowRounded />
-              </Button>
-            </Tooltip>
-            <Tooltip title="Pause">
-              <Button mini={true} color="secondary" onClick={this.pauseAudio}>
-                <Pause />
-              </Button>
-            </Tooltip>
-            <Tooltip title={`Export labels for ${this.props.filepath} to '~/reverb-export'`}>
-              <Button mini={true} onClick={this.handleDownloadLabels}>
-                <CloudDownload />
-              </Button>
-            </Tooltip>
-            <TextField
+        <Paper>
+          {wavesurfer && (
+            <div className="toolbar">
+              <Tooltip title="Play">
+                <Button mini={true} color="primary" onClick={this.playAudio}>
+                  <PlayArrowRounded />
+                </Button>
+              </Tooltip>
+              <Tooltip title="Pause">
+                <Button mini={true} color="secondary" onClick={this.pauseAudio}>
+                  <Pause />
+                </Button>
+              </Tooltip>
+              <Tooltip title={`Export labels for ${this.props.filepath} to '~/reverb-export'`}>
+                <Button mini={true} onClick={this.handleDownloadLabels}>
+                  <CloudDownload />
+                </Button>
+              </Tooltip>
+              {/* <TextField
               required={true}
               id="label"
               label="Label"
               margin="normal"
               onChange={this.handleLabelChange}
-            />
-            <Tooltip title="Add Label">
-              <Button mini={true} color="primary" onClick={this.handleAddLabel}>
-                <LabelImportant />
+              /> */}
+              <Tooltip title="Add Label">
+                <Button mini={true} color="primary" onClick={this.handleAddLabel}>
+                  <LabelImportant />
+                </Button>
+              </Tooltip>
+              <Tooltip title="Zoom In">
+                <Button mini={true} color="primary" onClick={this.handleZoomIn}>
+                  <ZoomIn />
+                </Button>
+              </Tooltip>
+              <Tooltip title="Zoom Out">
+                <Button mini={true} color="secondary" onClick={this.handleZoomOut}>
+                  <ZoomOut />
+                </Button>
+              </Tooltip>
+              <Tooltip title="(Re)generate Spectrogram; Warning! CPU intensive. Not recommended for > 4 minute files. Window may appear to freeze while computing.">
+                <Button mini={true} color="secondary" onClick={this.generateSpectrogram}>
+                  <GraphicEq />
+                </Button>
+              </Tooltip>
+              <Button
+                style={{ display: "none" }}
+                mini={true}
+                key="test-data"
+                color="secondary"
+                onClick={this.spawnTestData}
+              >
+                Spawn Test Data
               </Button>
-            </Tooltip>
-            <Tooltip title="Zoom In">
-              <Button mini={true} color="primary" onClick={this.handleZoomIn}>
-                <ZoomIn />
-              </Button>
-            </Tooltip>
-            <Tooltip title="Zoom Out">
-              <Button mini={true} color="secondary" onClick={this.handleZoomOut}>
-                <ZoomOut />
-              </Button>
-            </Tooltip>
-            <Tooltip title="(Re)generate Spectrogram; Warning! CPU intensive. Not recommended for > 4 minute files. Window may appear to freeze while computing.">
-              <Button mini={true} color="secondary" onClick={this.generateSpectrogram}>
-                <GraphicEq />
-              </Button>
-            </Tooltip>
-            <Button
-              style={{ display: "none" }}
-              mini={true}
-              key="test-data"
-              color="secondary"
-              onClick={this.spawnTestData}
-            >
-              Spawn Test Data
-            </Button>
-          </div>
-        )}
+            </div>
+          )}
 
-        <div ref={this.wavesurferContainerRef} style={maxWidthRefStyles} />
-        <div ref={this.timelineRef} style={maxWidthRefStyles} />
-        <div ref={this.spectrogramRef} style={maxWidthRefStyles} />
+          <div ref={this.wavesurferContainerRef} style={maxWidthRefStyles} />
+          <div ref={this.timelineRef} style={maxWidthRefStyles} />
+          <div ref={this.spectrogramRef} style={maxWidthRefStyles} />
+        </Paper>
+        <LabelTable
+          labels={this.state.labels}
+          playLabel={({ startTime, endTime }: Label) => {
+            const regions =
+              (wavesurfer &&
+                Object.values(wavesurfer.regions.list).filter(
+                  ({ start, end }) => start === startTime && end === endTime,
+                )) ||
+              [];
+            regions.forEach((r) => r.play());
+          }}
+          deleteLabel={({ startTime, endTime }: Label) => {
+            const regions =
+              (wavesurfer &&
+                Object.values(wavesurfer.regions.list).filter(
+                  ({ start, end }) => start === startTime && end === endTime,
+                )) ||
+              [];
+            regions.forEach((r) => r.remove());
+          }}
+        />
       </div>
     );
   }
@@ -211,7 +238,7 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
     endTime?: number;
     classification: Classification | string;
   }) => {
-    const { wavesurfer, audioFile_, audioBuffer_, audioContext } = this.state;
+    const { wavesurfer, audioFile_, audioBuffer_ } = this.state;
     const classification_ =
       typeof label.classification === "string"
         ? Promise.resolve(this.getClassification(label.classification))
@@ -247,7 +274,9 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
         console.error(err);
         const region =
           wavesurfer &&
-          wavesurfer.regions.find(({ start, end }) => start === startTime && end === endTime);
+          Object.values(wavesurfer.regions.list).find(
+            ({ start, end }) => start === startTime && end === endTime,
+          );
         ((r = region) => r && r.remove())();
         console.info(`Removing segment ${peaksSegmentId} from player`);
         return Promise.reject(err);
@@ -331,6 +360,8 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
   };
 
   /**
+   * Spectrogram plugin for WaveSurfer is sorta buggy.
+   * Destroy if already already there; then created
    * @see https://wavesurfer-js.org/v2/changes.html
    */
   private generateSpectrogram = async () => {
@@ -349,5 +380,45 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
           );
           ws.initPlugin("spectrogram");
         })();
+  };
+
+  private handleWavesurferRegionCreate = async (region: Region) => {
+    console.info("Creating label for", region.id, region);
+    // Make region correct color
+    region.color = stringToRGBA(this.state.classification);
+
+    // Create/Save Label
+    const { audioFile_, audioBuffer_, classification: label } = this.state;
+    return audioBuffer_.then((audioBuffer) =>
+      Audio.sliceAudioBuffer(audioBuffer, region.start, region.end).then((slicedBuffer) =>
+        Promise.all([
+          audioFile_,
+          this.getClassification(label),
+          DataBlob.create({
+            blob: Buffer.from(WavEncoder.encode(slicedBuffer)),
+          }).save(),
+        ]).then(([audioFile, classification, sampleData]) =>
+          Label.create({
+            startTime: region.start,
+            endTime: region.end,
+            audioFile,
+            classification,
+            sampleData,
+          })
+            .save()
+            .then((l) => {
+              region.id = l.id.toString();
+              console.log(region);
+              this.setState({ labels: [...this.state.labels, l] });
+              return l;
+            })
+            .catch((err) => {
+              region.remove();
+              console.error(err);
+              return Promise.reject(new Error(err));
+            }),
+        ),
+      ),
+    );
   };
 }

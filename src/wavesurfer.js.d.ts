@@ -202,6 +202,14 @@ declare module "wavesurfer.js/dist/plugin/wavesurfer.regions.js" {
     addRegion(options: RegionInitializationProps): void;
     clearRegions(): void;
     enableDragSelection(options?: Region): void;
-    regions: Region[];
+    regions: { list: { [id: string]: Region } };
+    on: <E extends keyof WaveSurferRegionEvents>(
+      event: E,
+      listener: WaveSurferRegionEvents[E],
+    ) => void;
+    un: <E extends keyof WaveSurferRegionEvents>(
+      event: E,
+      listener: WaveSurferRegionEvents[E],
+    ) => void;
   }
 }

@@ -9,6 +9,8 @@
       "allow-leading-underscore",
       "allow-trailing-underscore",
       "allow-pascal-case"
-    ]
+    ],
+    "jsx-no-lambda": false,
+    "no-submodule-imports": false // needed for wavesurfer plugin imports
   }
 }
