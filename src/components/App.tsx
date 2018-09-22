@@ -1,8 +1,8 @@
 import { Button, Grid, Tooltip, Typography } from "@material-ui/core";
 import React from "react";
 import { AudioFile } from "../entities/AudioFile";
-import { selectAudioFiles } from "../lib/electronHelpers";
-import { Filesystem } from "../lib/Filesystem";
+import { selectAudioFiles } from "../lib/electron-helpers";
+import { readFileAsBlob } from "../lib/filesystem";
 import { AudioPlayer, IAudioPlayerProps } from "./AudioPlayer";
 import { Header } from "./Header";
 
@@ -31,7 +31,7 @@ export class App extends React.PureComponent<any, IAppState> {
     const filepaths = await selectAudioFiles();
     const audioFiles = await Promise.all(
       filepaths.map(async (filepath) => {
-        const audioBlob = await Filesystem.readFileAsBlob(filepath);
+        const audioBlob = await readFileAsBlob(filepath);
         return {
           audioBlob,
           filepath,

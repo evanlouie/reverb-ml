@@ -1,5 +1,11 @@
-export const stringToRGBA = (str: string): string => {
-  const cached = _cache[str] || (_cache[str] = randomColour(hexToRGB(stringToHexColour(str))));
+export const stringToRGBA = (
+  str: string,
+  options?: { red?: number; green?: number; blue?: number; alpha?: number },
+): string => {
+  const cacheStr = str + JSON.stringify(options);
+  const cached =
+    _cache[cacheStr] ||
+    (_cache[cacheStr] = randomColour({ ...hexToRGB(stringToHexColour(str)), ...options }));
 
   return cached;
 };

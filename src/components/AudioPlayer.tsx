@@ -23,9 +23,9 @@ import { AudioFile } from "../entities/AudioFile";
 import { Classification } from "../entities/Classification";
 import { DataBlob } from "../entities/DataBlob";
 import { Label } from "../entities/Label";
-import { Audio } from "../lib/Audio";
+import { sliceAudioBuffer } from "../lib/Audio";
 import { stringToRGBA } from "../lib/colour";
-import { Database } from "../lib/Database";
+import { getDBConnection } from "../lib/database";
 import { WavEncoder } from "../lib/WavEncoder";
 import { LabelTable } from "./LabelTable";
 
@@ -50,7 +50,7 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
       dirname: dirname(filepath),
       basename: basename(filepath),
     };
-    return Database.getConnection().then(async (_) => {
+    return getDBConnection().then(async (_) => {
       const record = await AudioFile.findOne(props);
       return record ? record : AudioFile.create(props).save();
     });
@@ -109,8 +109,6 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
     });
     wavesurfer.load(audioUrl);
     this.setState({ wavesurfer, labels });
-
-    window.wavesurfer = wavesurfer;
   }
 
   /**
@@ -126,7 +124,7 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
     return (
       // tslint:disable-next-line:jsx-no-lambda
       <div className="AudioPlayer" onKeyPress={() => console.log("KEY PRESSED")}>
-        <Paper>
+        <Paper style={{ paddingBottom: "5px", marginBottom: "5px" }}>
           {wavesurfer && (
             <div className="toolbar">
               <Tooltip title="Play">
@@ -251,7 +249,7 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
       .toString(36)
       .substring(2);
     const audioBuffer = await audioBuffer_;
-    const slicedSegment = await Audio.sliceAudioBuffer(audioBuffer, label.startTime, endTime);
+    const slicedSegment = await sliceAudioBuffer(audioBuffer, label.startTime, endTime);
     // DANGEROUS!! Using Node `Buffer` in front-end code so we can save the segment to DB. Will appear as a Uint8Array on client side when queried
     const [audioFile, classification, sampleData] = await Promise.all([
       audioFile_,
@@ -390,7 +388,7 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
     // Create/Save Label
     const { audioFile_, audioBuffer_, classification: label } = this.state;
     return audioBuffer_.then((audioBuffer) =>
-      Audio.sliceAudioBuffer(audioBuffer, region.start, region.end).then((slicedBuffer) =>
+      sliceAudioBuffer(audioBuffer, region.start, region.end).then((slicedBuffer) =>
         Promise.all([
           audioFile_,
           this.getClassification(label),
