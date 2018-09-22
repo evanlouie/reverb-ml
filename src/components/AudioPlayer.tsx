@@ -23,7 +23,7 @@ import { AudioFile } from "../entities/AudioFile";
 import { Classification } from "../entities/Classification";
 import { DataBlob } from "../entities/DataBlob";
 import { Label } from "../entities/Label";
-import { sliceAudioBuffer } from "../lib/Audio";
+import { sliceAudioBuffer } from "../lib/audio";
 import { stringToRGBA } from "../lib/colour";
 import { getDBConnection } from "../lib/database";
 import { WavEncoder } from "../lib/WavEncoder";

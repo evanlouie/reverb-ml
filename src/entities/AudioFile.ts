@@ -11,7 +11,7 @@ import {
   PrimaryGeneratedColumn,
 } from "typeorm";
 import { promisify } from "util";
-import { getPath } from "../lib/electronHelpers";
+import { getPath } from "../lib/electron-helpers";
 import { Label } from "./Label";
 
 @Entity()

@@ -4,7 +4,7 @@ import { AudioFile } from "../entities/AudioFile";
 import { Classification } from "../entities/Classification";
 import { DataBlob } from "../entities/DataBlob";
 import { Label } from "../entities/Label";
-import { getPath } from "./electronHelpers";
+import { getPath } from "./electron-helpers";
 
 export const createDBConnection = async () =>
   createConnection({
