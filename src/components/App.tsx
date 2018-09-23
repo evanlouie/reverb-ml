@@ -1,54 +1,41 @@
 import { Button, Grid, Tooltip, Typography } from "@material-ui/core";
 import React from "react";
 import { AudioFile } from "../entities/AudioFile";
-import { selectAudioFiles } from "../lib/electron-helpers";
+import { selectAudioFile, selectAudioFiles } from "../lib/electron-helpers";
 import { readFileAsBlob } from "../lib/filesystem";
 import { AudioPlayer, IAudioPlayerProps } from "./AudioPlayer";
 import { Header } from "./Header";
 
 interface IAppState {
-  audioFiles: IAudioPlayerProps[];
+  audioFile?: IAudioPlayerProps;
 }
-
-const player = (props: IAudioPlayerProps) => (
-  <Grid item={true} xs={12} key={props.filepath}>
-    <Typography variant="title" gutterBottom={true}>
-      {props.filepath}
-    </Typography>
-    <AudioPlayer {...props} />
-  </Grid>
-);
 
 export class App extends React.PureComponent<any, IAppState> {
   constructor(props: any) {
     super(props);
-    this.state = {
-      audioFiles: [],
-    };
+    this.state = {};
   }
 
   public selectAudio = async () => {
-    const filepaths = await selectAudioFiles();
-    const audioFiles = await Promise.all(
-      filepaths.map(async (filepath) => {
-        const audioBlob = await readFileAsBlob(filepath);
-        return {
-          audioBlob,
-          filepath,
-        };
-      }),
-    );
+    const filepath = await selectAudioFile();
+    const audioBlob = await readFileAsBlob(filepath);
 
-    this.setState({ audioFiles });
+    this.setState({
+      audioFile: {
+        audioBlob,
+        filepath,
+      },
+    });
   };
 
   public render() {
-    const { audioFiles } = this.state;
+    const { audioFile } = this.state;
     return (
       <div
         className="App"
         style={{
           height: "100vh",
+          maxHeight: "100vh",
           width: "100vw",
           display: "grid",
           gridGap: "1em",
@@ -101,10 +88,10 @@ export class App extends React.PureComponent<any, IAppState> {
         </nav>
 
         <main className="main" style={{ gridArea: "main", marginRight: "1em" }}>
-          {audioFiles.length === 0 ? (
-            <Typography variant="body1">Select audio file before to begin labelling</Typography>
+          {audioFile ? (
+            <AudioPlayer {...audioFile} />
           ) : (
-            audioFiles.map(player)
+            <Typography variant="body1">Select audio file before to begin labelling</Typography>
           )}
         </main>
       </div>

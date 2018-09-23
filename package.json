@@ -12,7 +12,11 @@
     "lint": "tslint --project tsconfig.json --type-check --force",
     "prettier": "prettier --write 'src/**/*.{ts,tsx,js,jsx,json,md,css,scss}'"
   },
-  "keywords": [],
+  "keywords": [
+    "audio",
+    "labelling",
+    "visualization"
+  ],
   "author": "Evan Louie <evan.louie@microsoft.com>",
   "license": "MIT",
   "config": {

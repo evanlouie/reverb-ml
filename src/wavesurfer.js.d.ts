@@ -154,7 +154,7 @@ declare module "wavesurfer.js/dist/plugin/wavesurfer.regions.js" {
   }
 
   interface Region extends RegionInitializationProps {
-    id: string;
+    id: string | number;
     loop: boolean;
     drag: boolean;
     resize: boolean;

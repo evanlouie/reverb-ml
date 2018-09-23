@@ -17,6 +17,38 @@ export const selectFiles = (): Promise<string[]> =>
  * Show a file selector with only Chromium supported audio extensions.
  * @see https://www.chromium.org/audio-video
  */
+export const selectAudioFile = (): Promise<string> =>
+  new Promise((resolve) =>
+    remote.dialog.showOpenDialog(
+      {
+        properties: ["openFile"],
+        filters: [
+          {
+            name: "Audio",
+            extensions: [
+              "flac",
+              // "mp4",
+              "m4a",
+              "mp3",
+              // "ogv",
+              "ogm",
+              "ogg",
+              "oga",
+              "opus",
+              // "webm",
+              "wav",
+            ],
+          },
+        ],
+      },
+      (files) => (files.length > 0 ? resolve(files[0]) : Promise.reject("No file selected")),
+    ),
+  );
+
+/**
+ * Show a file selector with only Chromium supported audio extensions.
+ * @see https://www.chromium.org/audio-video
+ */
 export const selectAudioFiles = (): Promise<string[]> =>
   new Promise((resolve) =>
     remote.dialog.showOpenDialog(

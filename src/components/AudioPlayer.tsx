@@ -39,7 +39,9 @@ interface IAudioPlayerState {
   audioBuffer_: Promise<AudioBuffer>;
   audioFile_: Promise<AudioFile>;
   classification: string;
+  currentlyPlayingLabelIds: number[];
   labels: Label[];
+  wavesurferRegionIdToLabelIdMap: { [wavesurferRegionId: string]: number };
   wavesurfer?: WaveSurferInstance & WaveSurferRegions;
   zoom: number;
 }
@@ -63,7 +65,9 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
     audioUrl: URL.createObjectURL(this.props.audioBlob),
     audioFile_: AudioPlayer.getRecord(this.props.filepath),
     classification: "default",
+    currentlyPlayingLabelIds: [],
     labels: [],
+    wavesurferRegionIdToLabelIdMap: {},
     zoom: 50,
   };
 
@@ -82,12 +86,19 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
     const audioFile = await audioFile_;
     const labels = await audioFile.getLabels();
     const regions = labels.map(
-      ({ startTime: start, endTime: end, classification: { name: labelName } }) => ({
+      ({ id, startTime: start, endTime: end, classification: { name: labelName } }) => ({
+        id,
         start,
         end,
         color: stringToRGBA(labelName),
       }),
     );
+    const wavesurferRegionIdToLabelIdMap = regions.reduce((carry, region) => {
+      return {
+        ...carry,
+        [region.id]: region.id,
+      };
+    }, {});
     const wavesurfer = WaveSurfer.create({
       container: this.wavesurferContainerRef.current as HTMLDivElement,
       waveColor: "violet",
@@ -106,9 +117,31 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
     wavesurfer.on("ready", () => {
       console.info("Wavesurfer ready");
       wavesurfer.on("region-created", this.handleWavesurferRegionCreate);
+      wavesurfer.on("region-in", (region: Region) => {
+        const correspondingLabelId = this.state.wavesurferRegionIdToLabelIdMap[region.id];
+        this.setState({
+          currentlyPlayingLabelIds: this.state.currentlyPlayingLabelIds.concat(
+            correspondingLabelId,
+          ),
+        });
+      });
+      wavesurfer.on("region-out", (region: Region) => {
+        const correspondingLabelId = this.state.wavesurferRegionIdToLabelIdMap[region.id];
+        this.setState({
+          currentlyPlayingLabelIds: this.state.currentlyPlayingLabelIds.filter(
+            (labelId) => labelId !== correspondingLabelId,
+          ),
+        });
+      });
     });
     wavesurfer.load(audioUrl);
-    this.setState({ wavesurfer, labels });
+    this.setState({
+      wavesurfer,
+      labels,
+      wavesurferRegionIdToLabelIdMap,
+    });
+
+    window.wavesurfer = wavesurfer;
   }
 
   /**
@@ -123,89 +156,98 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
     const maxWidthRefStyles = { width: "100%", minWidth: "20vw" };
     return (
       // tslint:disable-next-line:jsx-no-lambda
-      <div className="AudioPlayer" onKeyPress={() => console.log("KEY PRESSED")}>
-        <Paper style={{ paddingBottom: "5px", marginBottom: "5px" }}>
-          {wavesurfer && (
-            <div className="toolbar">
-              <Tooltip title="Play">
-                <Button mini={true} color="primary" onClick={this.playAudio}>
-                  <PlayArrowRounded />
+      <div
+        className="AudioPlayer"
+        style={{ display: "flex", flexDirection: "column", height: "100%" }}
+        onKeyPress={() => console.log("KEY PRESSED")}
+      >
+        <div style={{ paddingBottom: "5px", marginBottom: "5px", flex: 1 }}>
+          <Paper>
+            {wavesurfer && (
+              <div className="toolbar">
+                <Tooltip title="Play">
+                  <Button mini={true} color="primary" onClick={this.playAudio}>
+                    <PlayArrowRounded />
+                  </Button>
+                </Tooltip>
+                <Tooltip title="Pause">
+                  <Button mini={true} color="secondary" onClick={this.pauseAudio}>
+                    <Pause />
+                  </Button>
+                </Tooltip>
+                <Tooltip title={`Export labels for ${this.props.filepath} to '~/reverb-export'`}>
+                  <Button mini={true} onClick={this.handleDownloadLabels}>
+                    <CloudDownload />
+                  </Button>
+                </Tooltip>
+                {/* <TextField
+            required={true}
+            id="label"
+            label="Label"
+            margin="normal"
+            onChange={this.handleLabelChange}
+            /> */}
+                <Tooltip title="Add Label">
+                  <Button mini={true} color="primary" onClick={this.handleAddLabel}>
+                    <LabelImportant />
+                  </Button>
+                </Tooltip>
+                <Tooltip title="Zoom In">
+                  <Button mini={true} color="primary" onClick={this.handleZoomIn}>
+                    <ZoomIn />
+                  </Button>
+                </Tooltip>
+                <Tooltip title="Zoom Out">
+                  <Button mini={true} color="secondary" onClick={this.handleZoomOut}>
+                    <ZoomOut />
+                  </Button>
+                </Tooltip>
+                <Tooltip title="(Re)generate Spectrogram; Warning! CPU intensive. Not recommended for > 4 minute files. Window may appear to freeze while computing.">
+                  <Button mini={true} color="secondary" onClick={this.generateSpectrogram}>
+                    <GraphicEq />
+                  </Button>
+                </Tooltip>
+                <Button
+                  style={{ display: "none" }}
+                  mini={true}
+                  key="test-data"
+                  color="secondary"
+                  onClick={this.spawnTestData}
+                >
+                  Spawn Test Data
                 </Button>
-              </Tooltip>
-              <Tooltip title="Pause">
-                <Button mini={true} color="secondary" onClick={this.pauseAudio}>
-                  <Pause />
-                </Button>
-              </Tooltip>
-              <Tooltip title={`Export labels for ${this.props.filepath} to '~/reverb-export'`}>
-                <Button mini={true} onClick={this.handleDownloadLabels}>
-                  <CloudDownload />
-                </Button>
-              </Tooltip>
-              {/* <TextField
-              required={true}
-              id="label"
-              label="Label"
-              margin="normal"
-              onChange={this.handleLabelChange}
-              /> */}
-              <Tooltip title="Add Label">
-                <Button mini={true} color="primary" onClick={this.handleAddLabel}>
-                  <LabelImportant />
-                </Button>
-              </Tooltip>
-              <Tooltip title="Zoom In">
-                <Button mini={true} color="primary" onClick={this.handleZoomIn}>
-                  <ZoomIn />
-                </Button>
-              </Tooltip>
-              <Tooltip title="Zoom Out">
-                <Button mini={true} color="secondary" onClick={this.handleZoomOut}>
-                  <ZoomOut />
-                </Button>
-              </Tooltip>
-              <Tooltip title="(Re)generate Spectrogram; Warning! CPU intensive. Not recommended for > 4 minute files. Window may appear to freeze while computing.">
-                <Button mini={true} color="secondary" onClick={this.generateSpectrogram}>
-                  <GraphicEq />
-                </Button>
-              </Tooltip>
-              <Button
-                style={{ display: "none" }}
-                mini={true}
-                key="test-data"
-                color="secondary"
-                onClick={this.spawnTestData}
-              >
-                Spawn Test Data
-              </Button>
-            </div>
-          )}
+              </div>
+            )}
 
-          <div ref={this.wavesurferContainerRef} style={maxWidthRefStyles} />
-          <div ref={this.timelineRef} style={maxWidthRefStyles} />
-          <div ref={this.spectrogramRef} style={maxWidthRefStyles} />
-        </Paper>
-        <LabelTable
-          labels={this.state.labels}
-          playLabel={({ startTime, endTime }: Label) => {
-            const regions =
-              (wavesurfer &&
-                Object.values(wavesurfer.regions.list).filter(
-                  ({ start, end }) => start === startTime && end === endTime,
-                )) ||
-              [];
-            regions.forEach((r) => r.play());
-          }}
-          deleteLabel={({ startTime, endTime }: Label) => {
-            const regions =
-              (wavesurfer &&
-                Object.values(wavesurfer.regions.list).filter(
-                  ({ start, end }) => start === startTime && end === endTime,
-                )) ||
-              [];
-            regions.forEach((r) => r.remove());
-          }}
-        />
+            <div ref={this.wavesurferContainerRef} style={maxWidthRefStyles} />
+            <div ref={this.timelineRef} style={maxWidthRefStyles} />
+            <div ref={this.spectrogramRef} style={maxWidthRefStyles} />
+          </Paper>
+        </div>
+        {wavesurfer && (
+          <div style={{ flex: 2, height: 0, overflow: "scroll" }}>
+            <LabelTable
+              labels={this.state.labels}
+              currentlyPlayingLabelIds={this.state.currentlyPlayingLabelIds}
+              playLabel={({ id }: Label) => {
+                const correspondingRegionLabelIdPairs = Object.entries(
+                  this.state.wavesurferRegionIdToLabelIdMap,
+                ).filter(([_, labelId]) => id === labelId);
+                correspondingRegionLabelIdPairs.forEach(([regionId, _]) =>
+                  wavesurfer.regions.list[regionId].play(),
+                );
+              }}
+              deleteLabel={({ id }: Label) => {
+                const correspondingRegionLabelIdPairs = Object.entries(
+                  this.state.wavesurferRegionIdToLabelIdMap,
+                ).filter(([_, labelId]) => id === labelId);
+                correspondingRegionLabelIdPairs.forEach(([regionId, _]) =>
+                  wavesurfer.regions.list[regionId].remove(),
+                );
+              }}
+            />
+          </div>
+        )}
       </div>
     );
   }
@@ -283,17 +325,6 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
     return savedLabel;
   };
 
-  private addLabelToPeaks = async (...labels: Label[]) => {
-    const { wavesurfer } = this.state;
-    const regions = labels.map(({ startTime: start, endTime: end }) => ({
-      start,
-      end,
-    }));
-    return wavesurfer
-      ? regions.map(wavesurfer.addRegion) || regions
-      : Promise.reject(new Error(`Failed to add segments to Peaks instance.`));
-  };
-
   private getClassification = async (name: string) =>
     Classification.findOne({ name }).then((c) => c || Classification.create({ name }).save());
 
@@ -329,32 +360,29 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
         .then(({ id }) => AudioFile.exportLabels(id))
         .then(() => console.log("Export Complete")))();
 
-  private handleAddLabel = async () =>
-    (({ wavesurfer: surfer, classification } = this.state) =>
-      typeof surfer === "undefined"
-        ? Promise.reject(new Error("Wavesurfer not initiated"))
-        : this.addLabel({ startTime: surfer.getCurrentTime(), classification }))();
+  private handleAddLabel = async () => {
+    const { classification } = this.state;
+    return this.wavesurfer().then((ws) =>
+      this.addLabel({ startTime: ws.getCurrentTime(), classification }),
+    );
+  };
 
   private handleZoomIn = async () => {
-    const { wavesurfer: ws, zoom } = this.state;
+    const { zoom } = this.state;
     const zoomedIn = zoom + 20;
-    return !ws
-      ? Promise.reject(new Error("WaveSurfer not initialized"))
-      : (() => {
-          ws.zoom(zoomedIn);
-          this.setState({ zoom: zoomedIn });
-        })();
+    return this.wavesurfer().then((ws) => {
+      ws.zoom(zoomedIn);
+      this.setState({ zoom: zoomedIn });
+    });
   };
 
   private handleZoomOut = async () => {
-    const { wavesurfer: ws, zoom } = this.state;
+    const { zoom } = this.state;
     const zoomedOut = zoom >= 20 ? zoom - 20 : 0;
-    return !ws
-      ? Promise.reject(new Error("Wavesurfer not initialized"))
-      : (() => {
-          ws.zoom(zoomedOut);
-          this.setState({ zoom: zoomedOut });
-        })();
+    return this.wavesurfer().then((ws) => {
+      ws.zoom(zoomedOut);
+      this.setState({ zoom: zoomedOut });
+    });
   };
 
   /**
@@ -363,21 +391,18 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
    * @see https://wavesurfer-js.org/v2/changes.html
    */
   private generateSpectrogram = async () => {
-    const { wavesurfer: ws } = this.state;
-    return !ws
-      ? Promise.reject(new Error("Wavesurfer not initiated"))
-      : (() => {
-          if (Object.keys(ws.initialisedPluginList).indexOf("spectrogram") > -1) {
-            ws.destroyPlugin("spectrogram");
-          }
-          ws.addPlugin(
-            SpectrogramPlugin.create({
-              container: this.spectrogramRef.current as HTMLDivElement,
-              labels: true,
-            }),
-          );
-          ws.initPlugin("spectrogram");
-        })();
+    this.wavesurfer().then((ws) => {
+      if (Object.keys(ws.initialisedPluginList).indexOf("spectrogram") > -1) {
+        ws.destroyPlugin("spectrogram");
+      }
+      ws.addPlugin(
+        SpectrogramPlugin.create({
+          container: this.spectrogramRef.current as HTMLDivElement,
+          labels: true,
+        }),
+      );
+      ws.initPlugin("spectrogram");
+    });
   };
 
   private handleWavesurferRegionCreate = async (region: Region) => {
@@ -405,9 +430,14 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
           })
             .save()
             .then((l) => {
-              region.id = l.id.toString();
-              console.log(region);
-              this.setState({ labels: [...this.state.labels, l] });
+              const { labels, wavesurferRegionIdToLabelIdMap } = this.state;
+              this.setState({
+                labels: [...labels, l],
+                wavesurferRegionIdToLabelIdMap: {
+                  ...wavesurferRegionIdToLabelIdMap,
+                  [region.id]: l.id,
+                },
+              });
               return l;
             })
             .catch((err) => {
@@ -418,5 +448,10 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
         ),
       ),
     );
+  };
+
+  private wavesurfer = async () => {
+    const { wavesurfer: ws } = this.state;
+    return ws || Promise.reject("Wavesurfer not initialized");
   };
 }
