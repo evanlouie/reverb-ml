@@ -65,16 +65,18 @@ export class LabelTable extends React.PureComponent<ILabelTableProps> {
         <TableCell>{startTime}</TableCell>
         <TableCell>{endTime}</TableCell>
         <TableCell>
-          <Tooltip title="Play Label">
-            <Button mini={true} color="primary" onClick={() => playLabel(label)}>
-              <PlayArrow />
-            </Button>
-          </Tooltip>
-          <Tooltip title="Delete Label">
-            <Button mini={true} color="secondary" onClick={() => deleteLabel(label)}>
-              <Delete />
-            </Button>
-          </Tooltip>
+          <div style={{ display: "flex", flexDirection: "row", flexWrap: "nowrap" }}>
+            <Tooltip title="Play Label">
+              <Button mini={true} color="primary" onClick={() => playLabel(label)}>
+                <PlayArrow />
+              </Button>
+            </Tooltip>
+            <Tooltip title="Delete Label">
+              <Button mini={true} color="secondary" onClick={() => deleteLabel(label)}>
+                <Delete />
+              </Button>
+            </Tooltip>
+          </div>
         </TableCell>
       </TableRow>
     );
