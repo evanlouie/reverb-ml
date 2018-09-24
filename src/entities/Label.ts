@@ -21,10 +21,6 @@ export class Label extends BaseEntity {
     console.log("WROTE OUT FILES");
   }
 
-  // public static async export(label: Label) {
-  //   const audioFile = AudioFile.find({label})
-  // }
-
   @PrimaryGeneratedColumn()
   public id!: number;
 

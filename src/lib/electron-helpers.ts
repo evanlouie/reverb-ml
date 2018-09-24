@@ -17,7 +17,7 @@ export const selectFiles = (): Promise<string[]> =>
  * Show a file selector with only Chromium supported audio extensions.
  * @see https://www.chromium.org/audio-video
  */
-export const selectAudioFile = (): Promise<string> =>
+export const selectAudioFile = (): Promise<string[]> =>
   new Promise((resolve) =>
     remote.dialog.showOpenDialog(
       {
@@ -41,7 +41,7 @@ export const selectAudioFile = (): Promise<string> =>
           },
         ],
       },
-      (files) => (files.length > 0 ? resolve(files[0]) : Promise.reject("No file selected")),
+      (files) => resolve(files || []),
     ),
   );
 

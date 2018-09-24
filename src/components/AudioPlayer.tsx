@@ -82,9 +82,12 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
    * On initial mount, initialize PeaksJS into DOM
    */
   public async componentDidMount() {
+    console.log(this.props);
     const { audioFile_, zoom: minPxPerSec, audioUrl, audioBuffer_ } = this.state;
     const audioFile = await audioFile_;
-    const labels = await audioFile.getLabels();
+    const labels = await audioFile
+      .getLabels()
+      .then((unsorted) => unsorted.sort((a, b) => a.startTime - b.startTime));
     const regions = labels.map(
       ({ id, startTime: start, endTime: end, classification: { name: labelName } }) => ({
         id,
@@ -117,16 +120,16 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
     wavesurfer.on("ready", () => {
       console.info("Wavesurfer ready");
       wavesurfer.on("region-created", this.handleWavesurferRegionCreate);
-      wavesurfer.on("region-in", (region: Region) => {
-        const correspondingLabelId = this.state.wavesurferRegionIdToLabelIdMap[region.id];
+      wavesurfer.on("region-in", async ({ id: regionId }: Region) => {
+        const correspondingLabelId = this.state.wavesurferRegionIdToLabelIdMap[regionId];
         this.setState({
           currentlyPlayingLabelIds: this.state.currentlyPlayingLabelIds.concat(
             correspondingLabelId,
           ),
         });
       });
-      wavesurfer.on("region-out", (region: Region) => {
-        const correspondingLabelId = this.state.wavesurferRegionIdToLabelIdMap[region.id];
+      wavesurfer.on("region-out", async ({ id: regionId }: Region) => {
+        const correspondingLabelId = this.state.wavesurferRegionIdToLabelIdMap[regionId];
         this.setState({
           currentlyPlayingLabelIds: this.state.currentlyPlayingLabelIds.filter(
             (labelId) => labelId !== correspondingLabelId,
@@ -140,8 +143,6 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
       labels,
       wavesurferRegionIdToLabelIdMap,
     });
-
-    window.wavesurfer = wavesurfer;
   }
 
   /**
@@ -161,7 +162,13 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
         style={{ display: "flex", flexDirection: "column", height: "100%" }}
         onKeyPress={() => console.log("KEY PRESSED")}
       >
-        <div style={{ paddingBottom: "5px", marginBottom: "5px", flex: 1 }}>
+        <div
+          style={{
+            paddingBottom: "5px",
+            marginBottom: "5px",
+            // flex: 1
+          }}
+        >
           <Paper>
             {wavesurfer && (
               <div className="toolbar">

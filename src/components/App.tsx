@@ -1,4 +1,4 @@
-import { Button, Grid, Tooltip, Typography } from "@material-ui/core";
+import { Button, Tooltip, Typography } from "@material-ui/core";
 import React from "react";
 import { AudioFile } from "../entities/AudioFile";
 import { selectAudioFile, selectAudioFiles } from "../lib/electron-helpers";
@@ -7,29 +7,16 @@ import { AudioPlayer, IAudioPlayerProps } from "./AudioPlayer";
 import { Header } from "./Header";
 
 interface IAppState {
-  audioFile?: IAudioPlayerProps;
+  audioFiles: IAudioPlayerProps[];
 }
 
-export class App extends React.PureComponent<any, IAppState> {
-  constructor(props: any) {
-    super(props);
-    this.state = {};
-  }
-
-  public selectAudio = async () => {
-    const filepath = await selectAudioFile();
-    const audioBlob = await readFileAsBlob(filepath);
-
-    this.setState({
-      audioFile: {
-        audioBlob,
-        filepath,
-      },
-    });
+export class App extends React.Component<any, IAppState> {
+  public state: IAppState = {
+    audioFiles: [],
   };
 
   public render() {
-    const { audioFile } = this.state;
+    const { audioFiles } = this.state;
     return (
       <div
         className="App"
@@ -88,13 +75,28 @@ export class App extends React.PureComponent<any, IAppState> {
         </nav>
 
         <main className="main" style={{ gridArea: "main", marginRight: "1em" }}>
-          {audioFile ? (
-            <AudioPlayer {...audioFile} />
-          ) : (
+          {audioFiles.map((audioFile) => (
+            <AudioPlayer key={audioFile.filepath} {...audioFile} />
+          ))}
+          {audioFiles.length === 0 && (
             <Typography variant="body1">Select audio file before to begin labelling</Typography>
           )}
         </main>
       </div>
     );
   }
+
+  private selectAudio = async () => {
+    const filepaths = await selectAudioFile();
+    const audioFiles: IAudioPlayerProps[] = await Promise.all(
+      filepaths.map(async (filepath) => {
+        const audioBlob = await readFileAsBlob(filepath);
+        return {
+          audioBlob,
+          filepath,
+        };
+      }),
+    );
+    this.setState({ audioFiles });
+  };
 }

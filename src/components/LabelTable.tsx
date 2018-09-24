@@ -1,6 +1,5 @@
 import {
   Button,
-  Paper,
   Table,
   TableBody,
   TableCell,
@@ -20,8 +19,20 @@ interface ILabelTableProps {
   deleteLabel: (label: Label) => void;
 }
 export class LabelTable extends React.PureComponent<ILabelTableProps> {
+  private scrollIntoViewRefs: HTMLElement[] = [];
+
+  public componentDidUpdate() {
+    // Ensure the first label in always in view
+    if (this.scrollIntoViewRefs.length > 0) {
+      // behavior: "center" breaks scrollIntoView when having to scroll between many objects.
+      this.scrollIntoViewRefs[0].scrollIntoView({ block: "center" });
+    }
+  }
+
   public render() {
-    const { labels, currentlyPlayingLabelIds } = this.props;
+    this.scrollIntoViewRefs = [];
+    const { labels } = this.props;
+    const currentlyPlayingLabelIds = new Set(this.props.currentlyPlayingLabelIds);
     return (
       <div className="LabelTable">
         <Table>
@@ -34,11 +45,11 @@ export class LabelTable extends React.PureComponent<ILabelTableProps> {
             </TableRow>
           </TableHead>
           <TableBody>
-            {labels.sort((a, b) => a.startTime - b.startTime).map((label) => (
+            {labels.map((label) => (
               <this.LabelTableRow
                 key={label.id}
                 label={label}
-                isPlaying={currentlyPlayingLabelIds.includes(label.id)}
+                isPlaying={currentlyPlayingLabelIds.has(label.id)}
               />
             ))}
           </TableBody>
@@ -60,7 +71,12 @@ export class LabelTable extends React.PureComponent<ILabelTableProps> {
     return (
       <TableRow selected={isPlaying}>
         <TableCell>
-          <span style={{ color: stringToRGBA(name, { alpha: 1 }) }}>{name}</span>
+          <span
+            ref={(ref) => isPlaying && ref && this.scrollIntoViewRefs.push(ref)}
+            style={{ color: stringToRGBA(name, { alpha: 1 }) }}
+          >
+            {name}
+          </span>
         </TableCell>
         <TableCell>{startTime}</TableCell>
         <TableCell>{endTime}</TableCell>
