@@ -125,17 +125,13 @@ export class LabelTable extends React.PureComponent<ILabelTableProps> {
   }> = ({ classifications, label }) => {
     const { id: classificationId } = label.classification;
     return (
-      <Select
-        native={true}
-        value={classificationId}
-        onChange={this.handleClassificationChange(label)}
-      >
+      <select onChange={this.handleClassificationChange(label)} value={classificationId}>
         {classifications.map((classification) => (
           <option key={classification.id} value={classification.id}>
             {classification.name}
           </option>
         ))}
-      </Select>
+      </select>
     );
   };
 
@@ -148,7 +144,6 @@ export class LabelTable extends React.PureComponent<ILabelTableProps> {
         `Updating label from classification ${label.classification.id} to ${classification.id}`,
       );
       await this.props.updateLabelClassification(label, classification);
-      console.info("Updated label");
       return classification;
     } else {
       return Promise.reject(`Unable to find Classification with id ${label.classification.id}`);

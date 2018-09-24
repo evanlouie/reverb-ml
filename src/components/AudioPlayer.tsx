@@ -1,5 +1,6 @@
-import { Button, Paper, TextField, Tooltip, Typography } from "@material-ui/core";
+import { Button, Paper, Select, TextField, Tooltip, Typography } from "@material-ui/core";
 import {
+  AddComment,
   CloudDownload,
   GraphicEq,
   LabelImportant,
@@ -39,6 +40,7 @@ interface IAudioPlayerState {
   audioBuffer_: Promise<AudioBuffer>;
   audioFile_: Promise<AudioFile>;
   classification: string;
+  classifications: Classification[];
   currentlyPlayingLabelIds: number[];
   labels: Label[];
   wavesurferRegionIdToLabelIdMap: { [wavesurferRegionId: string]: number };
@@ -65,6 +67,7 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
     audioUrl: URL.createObjectURL(this.props.audioBlob),
     audioFile_: AudioPlayer.getRecord(this.props.filepath),
     classification: "default",
+    classifications: [],
     currentlyPlayingLabelIds: [],
     labels: [],
     wavesurferRegionIdToLabelIdMap: {},
@@ -83,6 +86,7 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
    */
   public async componentDidMount() {
     const { audioFile_, zoom: minPxPerSec, audioUrl } = this.state;
+    Classification.find().then((classifications) => this.setState({ classifications }));
     const audioFile = await audioFile_;
     const labels = await audioFile
       .getLabels()
@@ -135,6 +139,34 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
           ),
         });
       });
+      wavesurfer.on("region-updated", async ({ id: regionId }: Region) => {
+        console.info(`Updating region ${regionId}`);
+      });
+      wavesurfer.on("region-update-end", async ({ id: regionId, start, end }: Region) => {
+        console.info(`Updating region position ${regionId}`);
+        const correspondingLabelId = this.state.wavesurferRegionIdToLabelIdMap[regionId];
+        const correspondingLabelIndex = this.state.labels.findIndex(
+          ({ id: labelId }) => labelId === correspondingLabelId,
+        );
+        const correspondingLabel = await Label.findOne({ id: correspondingLabelId });
+        if (correspondingLabel) {
+          correspondingLabel.startTime = start;
+          correspondingLabel.endTime = end;
+          const updatedLabel = await correspondingLabel.save();
+          const updatedLabels = [...this.state.labels];
+          updatedLabels.splice(correspondingLabelIndex, 1, updatedLabel);
+          this.setState({
+            labels: updatedLabels,
+          });
+          return updatedLabel;
+        } else {
+          return Promise.reject(new Error(`Failed to find Label with id ${correspondingLabelId}`));
+        }
+      });
+      wavesurfer.on("region-dblclick", async (region: Region) => {
+        // BUG: calling region.play() continues to play after exiting the region
+        region.play();
+      });
     });
     wavesurfer.load(audioUrl);
     this.setState({
@@ -148,11 +180,12 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
    * Ensure Peaks is destroyed before unmounting (memory leaks).
    */
   public async componentWillUnmount() {
-    (({ wavesurfer: w } = this.state) => w && w.destroy())();
+    const w = await this.wavesurfer();
+    w.destroy();
   }
 
   public render() {
-    const { wavesurfer } = this.state;
+    const { wavesurfer, classifications } = this.state;
     const maxWidthRefStyles = { width: "100%", minWidth: "20vw" };
     return (
       // tslint:disable-next-line:jsx-no-lambda
@@ -171,6 +204,19 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
           }}
         >
           <Paper>
+            <Tooltip title="Choose the Classification to create new labels with.">
+              <Select native={true} fullWidth={true}>
+                {classifications.length === 0 && (
+                  <option>No classifications found in system.</option>
+                )}
+                {classifications.map(({ id, name }) => (
+                  <option key={id} value={id}>
+                    {name}
+                  </option>
+                ))}
+              </Select>
+            </Tooltip>
+
             {wavesurfer && (
               <div className="toolbar">
                 <Tooltip title="Play">
@@ -188,16 +234,9 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
                     <CloudDownload />
                   </Button>
                 </Tooltip>
-                {/* <TextField
-            required={true}
-            id="label"
-            label="Label"
-            margin="normal"
-            onChange={this.handleLabelChange}
-            /> */}
                 <Tooltip title="Add Label">
                   <Button mini={true} color="primary" onClick={this.handleAddLabel}>
-                    <LabelImportant />
+                    <AddComment />
                   </Button>
                 </Tooltip>
                 <Tooltip title="Zoom In">
@@ -259,6 +298,16 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
                 const updateIndex = this.state.labels.findIndex(
                   ({ id: labelId }) => labelId === label.id,
                 );
+                const [regionId] = Object.entries(this.state.wavesurferRegionIdToLabelIdMap).find(
+                  ([_, labelId]) => labelId === label.id,
+                ) || [undefined];
+                if (regionId) {
+                  // NOTE: wavesurfer bug; does not change color if .color is programmatically changed
+                  wavesurfer.regions.list[regionId].color = stringToRGBA(
+                    updatedLabel.classification.name,
+                  );
+                }
+
                 const labels = [...this.state.labels];
                 labels.splice(updateIndex, 1, updatedLabel);
                 this.setState({ labels });
@@ -296,7 +345,7 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
     endTime?: number;
     classification: Classification | string;
   }) => {
-    const { wavesurfer, audioFile_, audioBuffer_ } = this.state;
+    const { audioFile_, audioBuffer_ } = this.state;
     const classification_ =
       typeof label.classification === "string"
         ? Promise.resolve(this.getClassification(label.classification))
@@ -421,7 +470,7 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
   };
 
   private handleWavesurferRegionCreate = async (region: Region) => {
-    console.info("Creating label for", region.id, region);
+    console.info(`Creating label for region ${region.id}`);
     // Make region correct color
     region.color = stringToRGBA(this.state.classification);
 

@@ -4,10 +4,12 @@ import { AudioFile } from "../entities/AudioFile";
 import { selectAudioFile, selectAudioFiles } from "../lib/electron-helpers";
 import { readFileAsBlob } from "../lib/filesystem";
 import { AudioPlayer, IAudioPlayerProps } from "./AudioPlayer";
+import { ClassificationTable } from "./ClassificationTable";
 import { Header } from "./Header";
 
 interface IAppState {
   audioFiles: IAudioPlayerProps[];
+  currentPage?: "player" | "classifications" | "labels";
 }
 
 export class App extends React.Component<any, IAppState> {
@@ -16,7 +18,7 @@ export class App extends React.Component<any, IAppState> {
   };
 
   public render() {
-    const { audioFiles } = this.state;
+    const { audioFiles, currentPage } = this.state;
     return (
       <div
         className="App"
@@ -44,15 +46,19 @@ export class App extends React.Component<any, IAppState> {
               Label Audio File
             </Button>
           </Tooltip>
-          <Button
-            color="secondary"
-            onClick={this.selectAudio}
-            fullWidth={true}
-            size="small"
-            disabled={true}
-          >
-            Classifications
-          </Button>
+          <Tooltip title="Manage Classifications in system">
+            <Button
+              color="primary"
+              onClick={() => {
+                this.setState({ currentPage: "classifications" });
+              }}
+              fullWidth={true}
+              size="small"
+            >
+              Classifications
+            </Button>
+          </Tooltip>
+
           <Button
             color="secondary"
             onClick={this.selectAudio}
@@ -75,10 +81,10 @@ export class App extends React.Component<any, IAppState> {
         </nav>
 
         <main className="main" style={{ gridArea: "main", marginRight: "1em" }}>
-          {audioFiles.map((audioFile) => (
-            <AudioPlayer key={audioFile.filepath} {...audioFile} />
-          ))}
-          {audioFiles.length === 0 && (
+          {currentPage === "player" &&
+            audioFiles.map((audioFile) => <AudioPlayer key={audioFile.filepath} {...audioFile} />)}
+          {currentPage === "classifications" && <ClassificationTable />}
+          {!currentPage && (
             <Typography variant="body1">Select audio file before to begin labelling</Typography>
           )}
         </main>
@@ -97,6 +103,10 @@ export class App extends React.Component<any, IAppState> {
         };
       }),
     );
-    this.setState({ audioFiles });
+    if (audioFiles.length > 0) {
+      this.setState({ audioFiles, currentPage: "player" });
+    } else {
+      this.setState({ currentPage: undefined });
+    }
   };
 }
