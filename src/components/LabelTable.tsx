@@ -17,8 +17,9 @@ import { stringToRGBA } from "../lib/colour";
 interface ILabelTableProps {
   labels: Label[];
   currentlyPlayingLabelIds: number[];
-  playLabel: (label: Label) => void;
-  deleteLabel: (label: Label) => void;
+  playLabel: (label: Label) => Promise<any>;
+  deleteLabel: (label: Label) => Promise<any>;
+  updateLabelClassification: (label: Label, classification: Classification) => Promise<any>;
 }
 export class LabelTable extends React.PureComponent<ILabelTableProps> {
   public state = {
@@ -138,20 +139,19 @@ export class LabelTable extends React.PureComponent<ILabelTableProps> {
     );
   };
 
-  private handleClassificationChange = (l: Label) => async ({
+  private handleClassificationChange = (label: Label) => async ({
     target: { value },
   }: React.ChangeEvent<HTMLSelectElement>) => {
     const classification = this.state.classifications.find((c) => c.id.toString() === value);
     if (classification) {
       console.info(
-        `Updating label from classification ${l.classification.id} to ${classification.id}`,
+        `Updating label from classification ${label.classification.id} to ${classification.id}`,
       );
-      l.classification = classification;
-      const savedLabel = await l.save();
-      console.info("Updated label", savedLabel);
-      return savedLabel;
+      await this.props.updateLabelClassification(label, classification);
+      console.info("Updated label");
+      return classification;
     } else {
-      return Promise.reject(`Unable to find Classification with id ${l.classification.id}`);
+      return Promise.reject(`Unable to find Classification with id ${label.classification.id}`);
     }
   };
 }

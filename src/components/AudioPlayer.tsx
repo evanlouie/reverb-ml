@@ -46,17 +46,6 @@ interface IAudioPlayerState {
   zoom: number;
 }
 
-export const {
-  Provider: AudioPlayerProvider,
-  Consumer: AudioPlayerConsumer,
-} = React.createContext<{
-  classifications: Classification[];
-  labels: Label[];
-}>({
-  classifications: [],
-  labels: [],
-});
-
 export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPlayerState> {
   private static async getRecord(filepath: string): Promise<AudioFile> {
     const props = {
@@ -245,28 +234,36 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
         </div>
         {wavesurfer && (
           <div style={{ flex: 1, height: 0, overflow: "scroll" }}>
-            <AudioPlayerProvider value={{ labels: [], classifications: [] }}>
-              <LabelTable
-                labels={this.state.labels}
-                currentlyPlayingLabelIds={this.state.currentlyPlayingLabelIds}
-                playLabel={({ id }: Label) => {
-                  const correspondingRegionLabelIdPairs = Object.entries(
-                    this.state.wavesurferRegionIdToLabelIdMap,
-                  ).filter(([_, labelId]) => id === labelId);
-                  correspondingRegionLabelIdPairs.forEach(([regionId, _]) =>
-                    wavesurfer.regions.list[regionId].play(),
-                  );
-                }}
-                deleteLabel={({ id }: Label) => {
-                  const correspondingRegionLabelIdPairs = Object.entries(
-                    this.state.wavesurferRegionIdToLabelIdMap,
-                  ).filter(([_, labelId]) => id === labelId);
-                  correspondingRegionLabelIdPairs.forEach(([regionId, _]) =>
-                    wavesurfer.regions.list[regionId].remove(),
-                  );
-                }}
-              />
-            </AudioPlayerProvider>
+            <LabelTable
+              labels={this.state.labels}
+              currentlyPlayingLabelIds={this.state.currentlyPlayingLabelIds}
+              playLabel={async ({ id }: Label) => {
+                const correspondingRegionLabelIdPairs = Object.entries(
+                  this.state.wavesurferRegionIdToLabelIdMap,
+                ).filter(([_, labelId]) => id === labelId);
+                correspondingRegionLabelIdPairs.forEach(([regionId, _]) =>
+                  wavesurfer.regions.list[regionId].play(),
+                );
+              }}
+              deleteLabel={async ({ id }: Label) => {
+                const correspondingRegionLabelIdPairs = Object.entries(
+                  this.state.wavesurferRegionIdToLabelIdMap,
+                ).filter(([_, labelId]) => id === labelId);
+                correspondingRegionLabelIdPairs.forEach(([regionId, _]) =>
+                  wavesurfer.regions.list[regionId].remove(),
+                );
+              }}
+              updateLabelClassification={async (label: Label, classification: Classification) => {
+                label.classification = classification;
+                const updatedLabel = await label.save();
+                const updateIndex = this.state.labels.findIndex(
+                  ({ id: labelId }) => labelId === label.id,
+                );
+                const labels = [...this.state.labels];
+                labels.splice(updateIndex, 1, updatedLabel);
+                this.setState({ labels });
+              }}
+            />
           </div>
         )}
       </div>
