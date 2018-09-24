@@ -199,7 +199,7 @@ declare module "wavesurfer.js/dist/plugin/wavesurfer.regions.js" {
    * Methods added to core WaveSurfer instance when regions plugin initialized
    */
   interface WaveSurferRegions {
-    addRegion(options: RegionInitializationProps): void;
+    addRegion(options: RegionInitializationProps): Region;
     clearRegions(): void;
     enableDragSelection(options?: Region): void;
     regions: { list: { [id: string]: Region } };

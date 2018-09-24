@@ -82,8 +82,7 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
    * On initial mount, initialize PeaksJS into DOM
    */
   public async componentDidMount() {
-    console.log(this.props);
-    const { audioFile_, zoom: minPxPerSec, audioUrl, audioBuffer_ } = this.state;
+    const { audioFile_, zoom: minPxPerSec, audioUrl } = this.state;
     const audioFile = await audioFile_;
     const labels = await audioFile
       .getLabels()
@@ -294,9 +293,6 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
       label.startTime,
       label.endTime || label.startTime + 1, // Default to an endTime of startTime+1
     ];
-    const peaksSegmentId = Math.random()
-      .toString(36)
-      .substring(2);
     const audioBuffer = await audioBuffer_;
     const slicedSegment = await sliceAudioBuffer(audioBuffer, label.startTime, endTime);
     // DANGEROUS!! Using Node `Buffer` in front-end code so we can save the segment to DB. Will appear as a Uint8Array on client side when queried
@@ -307,8 +303,12 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
         blob: Buffer.from(WavEncoder.encode(slicedSegment)),
       }).save(),
     ]);
-    const wavesurferRegion = { start: startTime, end: endTime };
-    ((w = wavesurfer) => w && w.addRegion(wavesurferRegion))();
+    const wavesurferRegion = {
+      start: startTime,
+      end: endTime,
+      color: stringToRGBA(classification.name),
+    };
+    const region = await this.wavesurfer().then((ws) => ws.addRegion(wavesurferRegion));
     const savedLabel = Label.create({
       startTime,
       endTime,
@@ -319,13 +319,9 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
       .save()
       .catch((err) => {
         console.error(err);
-        const region =
-          wavesurfer &&
-          Object.values(wavesurfer.regions.list).find(
-            ({ start, end }) => start === startTime && end === endTime,
-          );
-        ((r = region) => r && r.remove())();
-        console.info(`Removing segment ${peaksSegmentId} from player`);
+        console.log(`Failed to save Label, removing corresponding region`);
+        region.remove();
+        console.info(`Removed region ${region.id} from player`);
         return Promise.reject(err);
       });
 
@@ -419,42 +415,41 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
 
     // Create/Save Label
     const { audioFile_, audioBuffer_, classification: label } = this.state;
-    return audioBuffer_.then((audioBuffer) =>
-      sliceAudioBuffer(audioBuffer, region.start, region.end).then((slicedBuffer) =>
-        Promise.all([
-          audioFile_,
-          this.getClassification(label),
-          DataBlob.create({
-            blob: Buffer.from(WavEncoder.encode(slicedBuffer)),
-          }).save(),
-        ]).then(([audioFile, classification, sampleData]) =>
-          Label.create({
-            startTime: region.start,
-            endTime: region.end,
-            audioFile,
-            classification,
-            sampleData,
-          })
-            .save()
-            .then((l) => {
-              const { labels, wavesurferRegionIdToLabelIdMap } = this.state;
-              this.setState({
-                labels: [...labels, l],
-                wavesurferRegionIdToLabelIdMap: {
-                  ...wavesurferRegionIdToLabelIdMap,
-                  [region.id]: l.id,
-                },
-              });
-              return l;
-            })
-            .catch((err) => {
-              region.remove();
-              console.error(err);
-              return Promise.reject(new Error(err));
-            }),
-        ),
-      ),
-    );
+
+    const audioBuffer = await audioBuffer_;
+    const slicedBuffer = await sliceAudioBuffer(audioBuffer, region.start, region.end);
+    const [audioFile, classification, sampleData] = await Promise.all([
+      audioFile_,
+      this.getClassification(label),
+      DataBlob.create({
+        blob: Buffer.from(WavEncoder.encode(slicedBuffer)),
+      }).save(),
+    ]);
+
+    return Label.create({
+      startTime: region.start,
+      endTime: region.end,
+      audioFile,
+      classification,
+      sampleData,
+    })
+      .save()
+      .then((l) => {
+        const { labels, wavesurferRegionIdToLabelIdMap } = this.state;
+        this.setState({
+          labels: [...labels, l],
+          wavesurferRegionIdToLabelIdMap: {
+            ...wavesurferRegionIdToLabelIdMap,
+            [region.id]: l.id,
+          },
+        });
+        return l;
+      })
+      .catch((err) => {
+        region.remove();
+        console.error(err);
+        return Promise.reject(new Error(err));
+      });
   };
 
   private wavesurfer = async () => {
