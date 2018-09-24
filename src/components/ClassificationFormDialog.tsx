@@ -8,10 +8,12 @@ import {
   TextField,
 } from "@material-ui/core";
 import React from "react";
+import { Classification } from "../entities/Classification";
 
 export class ClassificationFormDialog extends React.PureComponent {
   public state = {
     open: false,
+    nameField: "",
   };
 
   public handleClickOpen = () => {
@@ -40,13 +42,14 @@ export class ClassificationFormDialog extends React.PureComponent {
               label="Classification/Label Name"
               type="text"
               fullWidth={true}
+              onChange={({ target: { value: nameField } }) => this.setState({ nameField })}
             />
           </DialogContent>
           <DialogActions>
             <Button onClick={this.handleClose} color="primary">
               Cancel
             </Button>
-            <Button onClick={this.handleClose} color="primary">
+            <Button onClick={this.handleCreate} color="primary">
               Create
             </Button>
           </DialogActions>
@@ -54,4 +57,10 @@ export class ClassificationFormDialog extends React.PureComponent {
       </div>
     );
   }
+
+  private handleCreate = async () => {
+    const classification = Classification.create({ name: this.state.nameField }).save();
+    this.setState({ open: false, nameField: "" });
+    return classification;
+  };
 }

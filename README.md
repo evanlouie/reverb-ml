@@ -1,6 +1,6 @@
 # ReverbML
 
-Status: Buggy
+Status: Pretty stable
 
 ## Quickstart
 

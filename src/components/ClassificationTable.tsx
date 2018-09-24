@@ -1,4 +1,12 @@
-import { Table, TableBody, TableCell, TableHead, TableRow, Tooltip } from "@material-ui/core";
+import {
+  Button,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableRow,
+  Tooltip,
+} from "@material-ui/core";
 import React from "react";
 import { Classification } from "../entities/Classification";
 import { Label } from "../entities/Label";
@@ -16,14 +24,7 @@ export class ClassificationTable extends React.PureComponent<{}> {
 
   public async componentDidMount() {
     await getDBConnection();
-    const classifications = await Classification.find();
-    classifications.forEach(async (classification) => {
-      const labelCount = await Label.count({ classification });
-      this.setState({
-        labelCounts: { ...this.state.labelCounts, [classification.id]: labelCount },
-      });
-    });
-    this.setState({ classifications });
+    this.refreshClassifications();
   }
 
   public render() {
@@ -33,9 +34,21 @@ export class ClassificationTable extends React.PureComponent<{}> {
         className="ClassificationTable"
         style={{ height: "100%", display: "flex", flexDirection: "column" }}
       >
-        <Tooltip title="Add a Classification">
-          <ClassificationFormDialog />
-        </Tooltip>
+        <div style={{ display: "flex", flexDirection: "row", flexWrap: "nowrap" }}>
+          <Tooltip title="Add a Classification">
+            <ClassificationFormDialog />
+          </Tooltip>
+          <Tooltip title="Refresh table">
+            <Button
+              variant="outlined"
+              color="secondary"
+              onClick={() => this.refreshClassifications()}
+            >
+              Refresh
+            </Button>
+          </Tooltip>
+        </div>
+
         <div style={{ height: 0, flex: 1, overflow: "scroll" }}>
           <Table>
             <TableHead>
@@ -59,4 +72,16 @@ export class ClassificationTable extends React.PureComponent<{}> {
       </div>
     );
   }
+
+  private refreshClassifications = async () => {
+    const classifications = await Classification.find();
+    classifications.forEach(async (classification) => {
+      const labelCount = await Label.count({ classification });
+      this.setState({
+        labelCounts: { ...this.state.labelCounts, [classification.id]: labelCount },
+      });
+    });
+    this.setState({ classifications });
+    return classifications;
+  };
 }
