@@ -31,7 +31,12 @@ export class LabelTable extends React.PureComponent<ILabelTableProps> {
 
   private scrollIntoViewRefs: HTMLElement[] = [];
 
-  public componentDidUpdate() {
+  public async componentDidMount() {
+    const classifications = await Classification.find();
+    this.setState({ classifications });
+  }
+
+  public async componentDidUpdate() {
     // Ensure the first label in always in view
     if (this.scrollIntoViewRefs.length > 0) {
       // behavior: "center" breaks scrollIntoView when having to scroll between many objects.
@@ -116,17 +121,14 @@ export class LabelTable extends React.PureComponent<ILabelTableProps> {
   private ClassificationSelect: StatelessComponent<{
     classifications: Classification[];
     label: Label;
-  }> = ({
-    classifications,
-    label: {
-      classification: { id: classificationId },
-    },
-  }) => {
-    const handleChange = ({ target: { value } }: React.ChangeEvent<HTMLSelectElement>) => {
-      console.log(value);
-    };
+  }> = ({ classifications, label }) => {
+    const { id: classificationId } = label.classification;
     return (
-      <Select native={true} value={classificationId} onChange={handleChange}>
+      <Select
+        native={true}
+        value={classificationId}
+        onChange={this.handleClassificationChange(label)}
+      >
         {classifications.map((classification) => (
           <option key={classification.id} value={classification.id}>
             {classification.name}
@@ -134,5 +136,22 @@ export class LabelTable extends React.PureComponent<ILabelTableProps> {
         ))}
       </Select>
     );
+  };
+
+  private handleClassificationChange = (l: Label) => async ({
+    target: { value },
+  }: React.ChangeEvent<HTMLSelectElement>) => {
+    const classification = this.state.classifications.find((c) => c.id.toString() === value);
+    if (classification) {
+      console.info(
+        `Updating label from classification ${l.classification.id} to ${classification.id}`,
+      );
+      l.classification = classification;
+      const savedLabel = await l.save();
+      console.info("Updated label", savedLabel);
+      return savedLabel;
+    } else {
+      return Promise.reject(`Unable to find Classification with id ${l.classification.id}`);
+    }
   };
 }

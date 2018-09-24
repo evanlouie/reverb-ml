@@ -76,12 +76,7 @@ export class App extends React.Component<any, IAppState> {
 
         <main className="main" style={{ gridArea: "main", marginRight: "1em" }}>
           {audioFiles.map((audioFile) => (
-            <div key={audioFile.filepath} style={{ height: "100%" }}>
-              <Typography variant="title" gutterBottom={true}>
-                {audioFile.filepath}
-              </Typography>
-              <AudioPlayer key={audioFile.filepath} {...audioFile} />
-            </div>
+            <AudioPlayer key={audioFile.filepath} {...audioFile} />
           ))}
           {audioFiles.length === 0 && (
             <Typography variant="body1">Select audio file before to begin labelling</Typography>

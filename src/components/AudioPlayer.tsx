@@ -1,4 +1,4 @@
-import { Button, Paper, TextField, Tooltip } from "@material-ui/core";
+import { Button, Paper, TextField, Tooltip, Typography } from "@material-ui/core";
 import {
   CloudDownload,
   GraphicEq,
@@ -46,6 +46,17 @@ interface IAudioPlayerState {
   zoom: number;
 }
 
+export const {
+  Provider: AudioPlayerProvider,
+  Consumer: AudioPlayerConsumer,
+} = React.createContext<{
+  classifications: Classification[];
+  labels: Label[];
+}>({
+  classifications: [],
+  labels: [],
+});
+
 export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPlayerState> {
   private static async getRecord(filepath: string): Promise<AudioFile> {
     const props = {
@@ -54,7 +65,7 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
     };
     return getDBConnection().then(async (_) => {
       const record = await AudioFile.findOne(props);
-      return record ? record : AudioFile.create(props).save();
+      return record || AudioFile.create(props).save();
     });
   }
 
@@ -161,11 +172,13 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
         style={{ display: "flex", flexDirection: "column", height: "100%" }}
         onKeyPress={() => console.log("KEY PRESSED")}
       >
+        <Typography variant="title" gutterBottom={true}>
+          {this.props.filepath}
+        </Typography>
         <div
           style={{
             paddingBottom: "5px",
             marginBottom: "5px",
-            // flex: 1
           }}
         >
           <Paper>
@@ -231,27 +244,29 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
           </Paper>
         </div>
         {wavesurfer && (
-          <div style={{ flex: 2, height: 0, overflow: "scroll" }}>
-            <LabelTable
-              labels={this.state.labels}
-              currentlyPlayingLabelIds={this.state.currentlyPlayingLabelIds}
-              playLabel={({ id }: Label) => {
-                const correspondingRegionLabelIdPairs = Object.entries(
-                  this.state.wavesurferRegionIdToLabelIdMap,
-                ).filter(([_, labelId]) => id === labelId);
-                correspondingRegionLabelIdPairs.forEach(([regionId, _]) =>
-                  wavesurfer.regions.list[regionId].play(),
-                );
-              }}
-              deleteLabel={({ id }: Label) => {
-                const correspondingRegionLabelIdPairs = Object.entries(
-                  this.state.wavesurferRegionIdToLabelIdMap,
-                ).filter(([_, labelId]) => id === labelId);
-                correspondingRegionLabelIdPairs.forEach(([regionId, _]) =>
-                  wavesurfer.regions.list[regionId].remove(),
-                );
-              }}
-            />
+          <div style={{ flex: 1, height: 0, overflow: "scroll" }}>
+            <AudioPlayerProvider value={{ labels: [], classifications: [] }}>
+              <LabelTable
+                labels={this.state.labels}
+                currentlyPlayingLabelIds={this.state.currentlyPlayingLabelIds}
+                playLabel={({ id }: Label) => {
+                  const correspondingRegionLabelIdPairs = Object.entries(
+                    this.state.wavesurferRegionIdToLabelIdMap,
+                  ).filter(([_, labelId]) => id === labelId);
+                  correspondingRegionLabelIdPairs.forEach(([regionId, _]) =>
+                    wavesurfer.regions.list[regionId].play(),
+                  );
+                }}
+                deleteLabel={({ id }: Label) => {
+                  const correspondingRegionLabelIdPairs = Object.entries(
+                    this.state.wavesurferRegionIdToLabelIdMap,
+                  ).filter(([_, labelId]) => id === labelId);
+                  correspondingRegionLabelIdPairs.forEach(([regionId, _]) =>
+                    wavesurfer.regions.list[regionId].remove(),
+                  );
+                }}
+              />
+            </AudioPlayerProvider>
           </div>
         )}
       </div>
