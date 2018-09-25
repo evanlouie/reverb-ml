@@ -1,6 +1,5 @@
 import {
   Button,
-  Select,
   Table,
   TableBody,
   TableCell,
@@ -9,19 +8,20 @@ import {
   Tooltip,
 } from "@material-ui/core";
 import { Delete, PlayArrow } from "@material-ui/icons";
+import { List, Map, Set } from "immutable";
 import React, { StatelessComponent } from "react";
 import { Classification } from "../entities/Classification";
 import { Label } from "../entities/Label";
 import { stringToRGBA } from "../lib/colour";
 
 interface ILabelTableProps {
-  labels: Label[];
-  currentlyPlayingLabelIds: number[];
+  labels: List<Label>;
+  currentlyPlayingLabelIds: Set<number>;
   playLabel: (label: Label) => Promise<any>;
   deleteLabel: (label: Label) => Promise<any>;
   updateLabelClassification: (label: Label, classification: Classification) => Promise<any>;
 }
-export class LabelTable extends React.PureComponent<ILabelTableProps> {
+export class LabelTable extends React.Component<ILabelTableProps> {
   public state = {
     classifications: Object.values(
       this.props.labels.reduce<{ [id: number]: Classification }>((classifications, label) => {
@@ -47,8 +47,7 @@ export class LabelTable extends React.PureComponent<ILabelTableProps> {
 
   public render() {
     this.scrollIntoViewRefs = [];
-    const { labels } = this.props;
-    const currentlyPlayingLabelIds = new Set(this.props.currentlyPlayingLabelIds);
+    const { labels, currentlyPlayingLabelIds } = this.props;
     return (
       <div className="LabelTable">
         <Table>
@@ -87,11 +86,11 @@ export class LabelTable extends React.PureComponent<ILabelTableProps> {
     return (
       <TableRow selected={isPlaying}>
         <TableCell>
-          <span
-            ref={(ref) => isPlaying && ref && this.scrollIntoViewRefs.push(ref)}
-            style={{ color: stringToRGBA(name, { alpha: 1 }) }}
-          >
-            <this.ClassificationSelect {...{ classifications, label }} />
+          <span ref={(ref) => isPlaying && ref && this.scrollIntoViewRefs.push(ref)}>
+            <ClassificationSelect
+              {...{ classifications, label }}
+              updateLabelClassification={this.props.updateLabelClassification}
+            />
           </span>
         </TableCell>
         <TableCell>{startTime}</TableCell>
@@ -118,32 +117,53 @@ export class LabelTable extends React.PureComponent<ILabelTableProps> {
     this.props.playLabel(label);
   private handleDeleteLabel = (label: Label) => (_: React.MouseEvent<HTMLElement>) =>
     this.props.deleteLabel(label);
+}
 
-  private ClassificationSelect: StatelessComponent<{
-    classifications: Classification[];
-    label: Label;
-  }> = ({ classifications, label }) => {
-    const { id: classificationId } = label.classification;
+// A helper class so that we can use forceUpdate after updating the label.
+// Modifying the Label Classification will not trigger a detected change in ImmutableJS as it is a
+// nested object which is being changed.
+// tslint:disable-next-line:max-classes-per-file
+class ClassificationSelect extends React.PureComponent<{
+  classifications: Classification[];
+  label: Label;
+  updateLabelClassification: (label: Label, classification: Classification) => Promise<any>;
+}> {
+  public render() {
+    const { label, classifications } = this.props;
+    const { id: classificationId, name: classificationName } = label.classification;
     return (
-      <select onChange={this.handleClassificationChange(label)} value={classificationId}>
-        {classifications.map((classification) => (
-          <option key={classification.id} value={classification.id}>
-            {classification.name}
-          </option>
-        ))}
-      </select>
+      <span style={{ display: "flex", flexWrap: "nowrap", alignItems: "center" }}>
+        <select
+          key="select"
+          onChange={this.handleClassificationChange(label)}
+          value={classificationId}
+        >
+          {classifications.map((classification) => (
+            <option key={classification.id} value={classification.id}>
+              {classification.name}
+            </option>
+          ))}
+        </select>
+        <span
+          key="color-indicator"
+          style={{ color: stringToRGBA(classificationName, { alpha: 1 }) }}
+        >
+          ●
+        </span>
+      </span>
     );
-  };
+  }
 
   private handleClassificationChange = (label: Label) => async ({
     target: { value },
   }: React.ChangeEvent<HTMLSelectElement>) => {
-    const classification = this.state.classifications.find((c) => c.id.toString() === value);
+    const classification = this.props.classifications.find((c) => c.id.toString() === value);
     if (classification) {
       console.info(
         `Updating label from classification ${label.classification.id} to ${classification.id}`,
       );
       await this.props.updateLabelClassification(label, classification);
+      this.forceUpdate();
       return classification;
     } else {
       return Promise.reject(`Unable to find Classification with id ${label.classification.id}`);

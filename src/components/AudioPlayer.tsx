@@ -10,6 +10,7 @@ import {
   ZoomOut,
 } from "@material-ui/icons";
 import { Buffer } from "buffer";
+import { List, Map, Range, Seq, Set } from "immutable";
 import { basename, dirname } from "path";
 import React from "react";
 import WaveSurfer, { WaveSurferInstance } from "wavesurfer.js";
@@ -40,10 +41,10 @@ interface IAudioPlayerState {
   audioBuffer_: Promise<AudioBuffer>;
   audioFile_: Promise<AudioFile>;
   classification: string;
-  classifications: Classification[];
-  currentlyPlayingLabelIds: number[];
-  labels: Label[];
-  wavesurferRegionIdToLabelIdMap: { [wavesurferRegionId: string]: number };
+  classifications: List<Classification>;
+  currentlyPlayingLabelIds: Set<number>;
+  labels: List<Label>;
+  wavesurferRegionIdToLabelIdMap: Map<string | number, number>;
   wavesurfer?: WaveSurferInstance & WaveSurferRegions;
   zoom: number;
 }
@@ -67,10 +68,10 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
     audioUrl: URL.createObjectURL(this.props.audioBlob),
     audioFile_: AudioPlayer.getRecord(this.props.filepath),
     classification: "default",
-    classifications: [],
-    currentlyPlayingLabelIds: [],
-    labels: [],
-    wavesurferRegionIdToLabelIdMap: {},
+    classifications: List(),
+    currentlyPlayingLabelIds: Set(),
+    labels: List(),
+    wavesurferRegionIdToLabelIdMap: Map(),
     zoom: 50,
   };
 
@@ -86,11 +87,13 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
    */
   public async componentDidMount() {
     const { audioFile_, zoom: minPxPerSec, audioUrl } = this.state;
-    Classification.find().then((classifications) => this.setState({ classifications }));
+    Classification.find().then((classifications) =>
+      this.setState({ classifications: List(classifications) }),
+    );
     const audioFile = await audioFile_;
     const labels = await audioFile
       .getLabels()
-      .then((unsorted) => unsorted.sort((a, b) => a.startTime - b.startTime));
+      .then((unsorted) => List(unsorted).sort((a, b) => a.startTime - b.startTime));
     const regions = labels.map(
       ({ id, startTime: start, endTime: end, classification: { name: labelName } }) => ({
         id,
@@ -99,12 +102,10 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
         color: stringToRGBA(labelName),
       }),
     );
-    const wavesurferRegionIdToLabelIdMap = regions.reduce((carry, region) => {
-      return {
-        ...carry,
-        [region.id]: region.id,
-      };
-    }, {});
+    const wavesurferRegionIdToLabelIdMap = regions.reduce(
+      (carry, { id: regionId }) => carry.set(regionId, regionId),
+      Map<string | number, number>(),
+    );
     const wavesurfer = WaveSurfer.create({
       container: this.wavesurferContainerRef.current as HTMLDivElement,
       waveColor: "violet",
@@ -115,7 +116,7 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
       plugins: [
         TimelinePlugin.create({ container: this.timelineRef.current as HTMLDivElement }),
         MinimapPlugin.create(),
-        RegionsPlugin.create({ dragSelection: true, regions }),
+        RegionsPlugin.create({ dragSelection: true, regions: regions.toArray() }),
       ],
     }) as WaveSurferInstance & WaveSurferRegions;
 
@@ -124,27 +125,31 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
       console.info("Wavesurfer ready");
       wavesurfer.on("region-created", this.handleWavesurferRegionCreate);
       wavesurfer.on("region-in", async ({ id: regionId }: Region) => {
-        const correspondingLabelId = this.state.wavesurferRegionIdToLabelIdMap[regionId];
-        this.setState({
-          currentlyPlayingLabelIds: this.state.currentlyPlayingLabelIds.concat(
-            correspondingLabelId,
-          ),
-        });
+        const correspondingLabelId = this.state.wavesurferRegionIdToLabelIdMap.get(regionId);
+        correspondingLabelId
+          ? this.setState({
+              currentlyPlayingLabelIds: this.state.currentlyPlayingLabelIds.add(
+                correspondingLabelId,
+              ),
+            })
+          : console.error(`Failed to find corresponding label Id for region ${regionId}`);
       });
       wavesurfer.on("region-out", async ({ id: regionId }: Region) => {
-        const correspondingLabelId = this.state.wavesurferRegionIdToLabelIdMap[regionId];
-        this.setState({
-          currentlyPlayingLabelIds: this.state.currentlyPlayingLabelIds.filter(
-            (labelId) => labelId !== correspondingLabelId,
-          ),
-        });
+        const correspondingLabelId = this.state.wavesurferRegionIdToLabelIdMap.get(regionId);
+        correspondingLabelId
+          ? this.setState({
+              currentlyPlayingLabelIds: this.state.currentlyPlayingLabelIds.remove(
+                correspondingLabelId,
+              ),
+            })
+          : console.error(`Failed to find corresponding label Id for region ${regionId}`);
       });
       wavesurfer.on("region-updated", async ({ id: regionId }: Region) => {
         console.info(`Updating region ${regionId}`);
       });
       wavesurfer.on("region-update-end", async ({ id: regionId, start, end }: Region) => {
         console.info(`Updating region position ${regionId}`);
-        const correspondingLabelId = this.state.wavesurferRegionIdToLabelIdMap[regionId];
+        const correspondingLabelId = this.state.wavesurferRegionIdToLabelIdMap.get(regionId);
         const correspondingLabelIndex = this.state.labels.findIndex(
           ({ id: labelId }) => labelId === correspondingLabelId,
         );
@@ -153,10 +158,8 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
           correspondingLabel.startTime = start;
           correspondingLabel.endTime = end;
           const updatedLabel = await correspondingLabel.save();
-          const updatedLabels = [...this.state.labels];
-          updatedLabels.splice(correspondingLabelIndex, 1, updatedLabel);
           this.setState({
-            labels: updatedLabels,
+            labels: this.state.labels.set(correspondingLabelIndex, updatedLabel),
           });
           return updatedLabel;
         } else {
@@ -165,7 +168,8 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
       });
       wavesurfer.on("region-dblclick", async (region: Region) => {
         // BUG: calling region.play() continues to play after exiting the region
-        region.play();
+        // region.play();
+        wavesurfer.play(region.start, region.end);
       });
     });
     wavesurfer.load(audioUrl);
@@ -206,9 +210,7 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
           <Paper>
             <Tooltip title="Choose the Classification to create new labels with.">
               <Select native={true} fullWidth={true}>
-                {classifications.length === 0 && (
-                  <option>No classifications found in system.</option>
-                )}
+                {classifications.size === 0 && <option>No classifications found in system.</option>}
                 {classifications.map(({ id, name }) => (
                   <option key={id} value={id}>
                     {name}
@@ -276,41 +278,37 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
             <LabelTable
               labels={this.state.labels}
               currentlyPlayingLabelIds={this.state.currentlyPlayingLabelIds}
-              playLabel={async ({ id }: Label) => {
-                const correspondingRegionLabelIdPairs = Object.entries(
-                  this.state.wavesurferRegionIdToLabelIdMap,
-                ).filter(([_, labelId]) => id === labelId);
-                correspondingRegionLabelIdPairs.forEach(([regionId, _]) =>
-                  wavesurfer.regions.list[regionId].play(),
-                );
-              }}
-              deleteLabel={async ({ id }: Label) => {
-                const correspondingRegionLabelIdPairs = Object.entries(
-                  this.state.wavesurferRegionIdToLabelIdMap,
-                ).filter(([_, labelId]) => id === labelId);
-                correspondingRegionLabelIdPairs.forEach(([regionId, _]) =>
-                  wavesurfer.regions.list[regionId].remove(),
-                );
-              }}
+              playLabel={async ({ id: targetLabelId }: Label) =>
+                this.state.wavesurferRegionIdToLabelIdMap
+                  .filter((labelId) => labelId === targetLabelId)
+                  .map((_, regionId) => wavesurfer.regions.list[regionId])
+                  .take(1)
+                  .forEach((region) => {
+                    region.play();
+                  })
+              }
+              deleteLabel={async ({ id: targetLabelId }: Label) =>
+                this.state.wavesurferRegionIdToLabelIdMap
+                  .filter((labelId) => labelId === targetLabelId)
+                  .map((_, regionId) => wavesurfer.regions.list[regionId])
+                  .take(1)
+                  .forEach((region) => {
+                    region.remove();
+                  })
+              }
               updateLabelClassification={async (label: Label, classification: Classification) => {
+                const { labels, wavesurferRegionIdToLabelIdMap } = this.state;
                 label.classification = classification;
                 const updatedLabel = await label.save();
-                const updateIndex = this.state.labels.findIndex(
-                  ({ id: labelId }) => labelId === label.id,
-                );
-                const [regionId] = Object.entries(this.state.wavesurferRegionIdToLabelIdMap).find(
-                  ([_, labelId]) => labelId === label.id,
-                ) || [undefined];
-                if (regionId) {
-                  // NOTE: wavesurfer bug; does not change color if .color is programmatically changed
-                  wavesurfer.regions.list[regionId].color = stringToRGBA(
-                    updatedLabel.classification.name,
-                  );
-                }
-
-                const labels = [...this.state.labels];
-                labels.splice(updateIndex, 1, updatedLabel);
-                this.setState({ labels });
+                const updateIndex = labels.findIndex(({ id: labelId }) => labelId === label.id);
+                wavesurferRegionIdToLabelIdMap
+                  .filter((labelId, _) => labelId === label.id)
+                  .map((_, regionId) => wavesurfer.regions.list[regionId])
+                  .take(1)
+                  .forEach((region) => {
+                    region.color = stringToRGBA(updatedLabel.classification.name);
+                  });
+                this.setState({ labels: this.state.labels.set(updateIndex, updatedLabel) });
               }}
             />
           </div>
@@ -393,18 +391,17 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
     Classification.findOne({ name }).then((c) => c || Classification.create({ name }).save());
 
   private spawnTestData = async () => {
-    const classifications = await Promise.all(
-      [...Array(10)]
-        .map(() =>
-          Math.random()
-            .toString(36)
-            .substring(2),
-        )
-        .map((labelText) => Classification.create({ name: labelText }).save()),
-    );
+    const classifications_ = Range(0, 10)
+      .map(() =>
+        Math.random()
+          .toString(36)
+          .substring(2),
+      )
+      .map((labelText) => Classification.create({ name: labelText }).save());
+    const classifications = await Promise.all(classifications_);
     const audioBuffer = await this.state.audioBuffer_;
     const audioDuration = audioBuffer.duration - 1; // -1 because total length might be round up
-    const randomTimes = [...Array(1000)].map(() => Math.random() * audioDuration);
+    const randomTimes = Range(0, 1000).map(() => Math.random() * audioDuration);
     const labels = await Promise.all(
       randomTimes.map(async (startTime) => {
         const classification = classifications[Math.floor(Math.random() * classifications.length)];
@@ -498,7 +495,7 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
       .then((l) => {
         const { labels, wavesurferRegionIdToLabelIdMap } = this.state;
         this.setState({
-          labels: [...labels, l],
+          labels: labels.push(l),
           wavesurferRegionIdToLabelIdMap: {
             ...wavesurferRegionIdToLabelIdMap,
             [region.id]: l.id,
