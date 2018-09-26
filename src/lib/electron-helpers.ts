@@ -4,6 +4,23 @@
 // tslint:disable-next-line
 import { remote } from "electron";
 
+/**
+ * @see https://www.chromium.org/audio-video
+ */
+const supportedChromiumExtensions: string[] = [
+  "flac",
+  "mp4",
+  "m4a",
+  "mp3",
+  "ogv",
+  "ogm",
+  "ogg",
+  "oga",
+  "opus",
+  "webm",
+  "wav",
+];
+
 export const selectFiles = (): Promise<string[]> =>
   new Promise((resolve) =>
     remote.dialog.showOpenDialog(
@@ -14,10 +31,9 @@ export const selectFiles = (): Promise<string[]> =>
   );
 
 /**
- * Show a file selector with only Chromium supported audio extensions.
- * @see https://www.chromium.org/audio-video
+ * Show a single file selector with only Chromium supported media extensions
  */
-export const selectAudioFile = (): Promise<string[]> =>
+export const selectMediaFile = ({ filter = (extension: string) => true } = {}): Promise<string[]> =>
   new Promise((resolve) =>
     remote.dialog.showOpenDialog(
       {
@@ -25,19 +41,7 @@ export const selectAudioFile = (): Promise<string[]> =>
         filters: [
           {
             name: "Audio",
-            extensions: [
-              "flac",
-              // "mp4",
-              "m4a",
-              "mp3",
-              // "ogv",
-              "ogm",
-              "ogg",
-              "oga",
-              "opus",
-              // "webm",
-              "wav",
-            ],
+            extensions: supportedChromiumExtensions.filter(filter),
           },
         ],
       },
@@ -47,35 +51,11 @@ export const selectAudioFile = (): Promise<string[]> =>
 
 /**
  * Show a file selector with only Chromium supported audio extensions.
- * @see https://www.chromium.org/audio-video
  */
-export const selectAudioFiles = (): Promise<string[]> =>
-  new Promise((resolve) =>
-    remote.dialog.showOpenDialog(
-      {
-        properties: ["openFile", "multiSelections"],
-        filters: [
-          {
-            name: "Audio",
-            extensions: [
-              "flac",
-              // "mp4",
-              "m4a",
-              "mp3",
-              // "ogv",
-              "ogm",
-              "ogg",
-              "oga",
-              "opus",
-              // "webm",
-              "wav",
-            ],
-          },
-        ],
-      },
-      (files) => resolve(files || []),
-    ),
-  );
+export const selectAudioFile = () =>
+  selectMediaFile({
+    filter: (ext) => ["mp4", "ogv", "webm"].includes(ext) === false,
+  });
 
 /**
  * @see https://github.com/electron/electron/blob/master/docs/api/app.md#appgetpathname

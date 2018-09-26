@@ -1,14 +1,14 @@
 import { Button, Snackbar, Tooltip, Typography } from "@material-ui/core";
 import React from "react";
 import { AudioFile } from "../entities/AudioFile";
-import { selectAudioFile, selectAudioFiles } from "../lib/electron-helpers";
+import { selectMediaFile } from "../lib/electron-helpers";
 import { readFileAsBlob } from "../lib/filesystem";
 import { AudioPlayer, IAudioPlayerProps } from "./AudioPlayer";
 import { ClassificationTable } from "./ClassificationTable";
 import { Header } from "./Header";
 
 interface IAppState {
-  audioFiles: IAudioPlayerProps[];
+  mediaFiles: IAudioPlayerProps[];
   currentPage?: "player" | "classifications" | "labels";
   snackBarOpen: boolean;
   snackBarText: string;
@@ -16,13 +16,13 @@ interface IAppState {
 
 export class App extends React.Component<any, IAppState> {
   public state: IAppState = {
-    audioFiles: [],
+    mediaFiles: [],
     snackBarOpen: false,
     snackBarText: "",
   };
 
   public render() {
-    const { audioFiles, currentPage } = this.state;
+    const { mediaFiles, currentPage } = this.state;
     return (
       <div
         className="App"
@@ -93,7 +93,7 @@ export class App extends React.Component<any, IAppState> {
 
         <main className="main" style={{ gridArea: "main", marginRight: "1em" }}>
           {currentPage === "player" &&
-            audioFiles.map((audioFile) => <AudioPlayer key={audioFile.filepath} {...audioFile} />)}
+            mediaFiles.map((audioFile) => <AudioPlayer key={audioFile.filepath} {...audioFile} />)}
           {currentPage === "classifications" && <ClassificationTable />}
           {!currentPage && (
             <Typography variant="body1">Select audio file before to begin labelling</Typography>
@@ -110,8 +110,8 @@ export class App extends React.Component<any, IAppState> {
   }
 
   private selectAudio = async () => {
-    const filepaths = await selectAudioFile();
-    const audioFiles: IAudioPlayerProps[] = await Promise.all(
+    const filepaths = await selectMediaFile();
+    const mediaFiles: IAudioPlayerProps[] = await Promise.all(
       filepaths.map(async (filepath) => {
         const audioBlob = await readFileAsBlob(filepath);
         return {
@@ -120,8 +120,8 @@ export class App extends React.Component<any, IAppState> {
         };
       }),
     );
-    if (audioFiles.length > 0) {
-      this.setState({ audioFiles, currentPage: "player" });
+    if (mediaFiles.length > 0) {
+      this.setState({ mediaFiles, currentPage: "player" });
     } else {
       this.setState({ currentPage: undefined });
     }
