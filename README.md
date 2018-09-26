@@ -1,12 +1,32 @@
 # ReverbML
 
+> An Electron app to play, visualize, and annotate your audio files for machine learning
+
 Status: Pretty stable
 
 ## Quickstart
 
+### Running Development
+
 ```bash
 yarn install
 yarn run start
+```
+
+### Building
+
+Make a compiled executable for your current local platform (will generate; ie `.app` for macOS). Output will be to `out` directory.
+
+```bash
+yarn install
+yarn run package
+```
+
+Same as `package` except packages it in a distributable manner for your current local platform; ie `.zip` for macOS or `dep` and `rpm` for Linux. Output will be to `out` directory.
+
+```bash
+yarn install
+yarn run make
 ```
 
 ## Instructions
@@ -14,7 +34,7 @@ yarn run start
 - Local database saved to your `~/reverb.sqlite3`.
 - Audio samples are saved to `~/reverb-export`.
 
-## Notes
+## Developer Notes
 
 - As of `"typeorm": "^0.2.7"`, the docs are wrong for lazy loading relations. Even when property type is `Promise<T>` as the docs say, attempting to save the record will fail. (even though their examples says you should be able to do {key: Promise.resolve<T>(value)}) https://github.com/typeorm/typeorm/issues/2276
 - Consider migrating `Classification` back into the `Label` table. Although it breaks BCNF, it causes concurrency issues when attempting to spawn multiple labels at once
@@ -27,3 +47,7 @@ yarn run start
 - `.tsx?` files which start with a capital do a named class export of the same filename; other files are considered lib files and can export anything.
 - `do` style operations are within IIFE.
 - Variables **suffixed** with `_` are of type `Promise<T>` or some unresolved type.
+
+## Special Thanks
+
+- This project is heavily influenced by our sister project https://github.com/ritazh/EchoML/
