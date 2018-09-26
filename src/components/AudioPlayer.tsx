@@ -88,12 +88,12 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
   public async componentDidMount() {
     const { audioFile_, zoom: minPxPerSec, audioUrl } = this.state;
     Classification.find().then((classifications) =>
-      this.setState({ classifications: List(classifications) }),
+      this.setState({ classifications: this.state.classifications.concat(classifications) }),
     );
     const audioFile = await audioFile_;
     const labels = await audioFile
       .getLabels()
-      .then((unsorted) => List(unsorted).sort((a, b) => a.startTime - b.startTime));
+      .then((unsorted) => unsorted.sort((a, b) => a.startTime - b.startTime));
     const regions = labels.map(
       ({ id, startTime: start, endTime: end, classification: { name: labelName } }) => ({
         id,
@@ -116,7 +116,7 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
       plugins: [
         TimelinePlugin.create({ container: this.timelineRef.current as HTMLDivElement }),
         MinimapPlugin.create(),
-        RegionsPlugin.create({ dragSelection: true, regions: regions.toArray() }),
+        RegionsPlugin.create({ dragSelection: true, regions }),
       ],
     }) as WaveSurferInstance & WaveSurferRegions;
 
@@ -159,7 +159,9 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
           correspondingLabel.endTime = end;
           const updatedLabel = await correspondingLabel.save();
           this.setState({
-            labels: this.state.labels.set(correspondingLabelIndex, updatedLabel),
+            labels: this.state.labels
+              .set(correspondingLabelIndex, updatedLabel)
+              .sort((a, b) => a.startTime - b.startTime),
           });
           return updatedLabel;
         } else {
@@ -175,7 +177,7 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
     wavesurfer.load(audioUrl);
     this.setState({
       wavesurfer,
-      labels,
+      labels: this.state.labels.concat(labels),
       wavesurferRegionIdToLabelIdMap,
     });
   }
@@ -251,8 +253,8 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
                     <ZoomOut />
                   </Button>
                 </Tooltip>
-                <Tooltip title="(Re)generate Spectrogram; Warning! CPU intensive. Not recommended for > 4 minute files. Window may appear to freeze while computing.">
-                  <Button mini={true} color="secondary" onClick={this.generateSpectrogram}>
+                <Tooltip title="Toggle Spectrogram; Warning! CPU intensive. Not recommended for > 4 minute files. Window may appear to freeze while computing.">
+                  <Button mini={true} color="secondary" onClick={this.toggleSpectrogram}>
                     <GraphicEq />
                   </Button>
                 </Tooltip>
@@ -306,6 +308,7 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
                   .map((_, regionId) => wavesurfer.regions.list[regionId])
                   .take(1)
                   .forEach((region) => {
+                    // BUG: wavesurfer doesn't update the color until the a redraw is triggered by interacting with waveform
                     region.color = stringToRGBA(updatedLabel.classification.name);
                   });
                 this.setState({ labels: this.state.labels.set(updateIndex, updatedLabel) });
@@ -446,24 +449,35 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
     });
   };
 
+  private toggleSpectrogram = async () => {
+    const ws = await this.wavesurfer();
+    if (Object.keys(ws.initialisedPluginList).includes("spectrogram")) {
+      this.destroySpectrogram(ws);
+    } else {
+      this.generateSpectrogram(ws);
+    }
+  };
+
   /**
    * Spectrogram plugin for WaveSurfer is sorta buggy.
    * Destroy if already already there; then created
    * @see https://wavesurfer-js.org/v2/changes.html
    */
-  private generateSpectrogram = async () => {
-    this.wavesurfer().then((ws) => {
-      if (Object.keys(ws.initialisedPluginList).indexOf("spectrogram") > -1) {
-        ws.destroyPlugin("spectrogram");
-      }
-      ws.addPlugin(
-        SpectrogramPlugin.create({
-          container: this.spectrogramRef.current as HTMLDivElement,
-          labels: true,
-        }),
-      );
-      ws.initPlugin("spectrogram");
-    });
+  private generateSpectrogram = async (ws: WaveSurferInstance) => {
+    if (Object.keys(ws.initialisedPluginList).includes("spectrogram")) {
+      this.destroySpectrogram(ws);
+    }
+    ws.addPlugin(
+      SpectrogramPlugin.create({
+        container: this.spectrogramRef.current as HTMLDivElement,
+        labels: true,
+      }),
+    );
+    ws.initPlugin("spectrogram");
+  };
+
+  private destroySpectrogram = async (ws: WaveSurferInstance) => {
+    ws.destroyPlugin("spectrogram");
   };
 
   private handleWavesurferRegionCreate = async (region: Region) => {
@@ -496,10 +510,7 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
         const { labels, wavesurferRegionIdToLabelIdMap } = this.state;
         this.setState({
           labels: labels.push(l),
-          wavesurferRegionIdToLabelIdMap: {
-            ...wavesurferRegionIdToLabelIdMap,
-            [region.id]: l.id,
-          },
+          wavesurferRegionIdToLabelIdMap: wavesurferRegionIdToLabelIdMap.set(region.id, l.id),
         });
         return l;
       })

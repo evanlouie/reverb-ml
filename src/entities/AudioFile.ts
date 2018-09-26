@@ -33,6 +33,7 @@ export class AudioFile extends BaseEntity {
             const buffer = sampleData.blob;
             await promisify(writeFile)(writePath, buffer);
             console.log(`Written: ${writePath}`);
+            return writePath;
           }),
         )
         .reduce((flattened, arr) => [...flattened, ...arr]),

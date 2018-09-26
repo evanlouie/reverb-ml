@@ -1,4 +1,4 @@
-import { Button, Tooltip, Typography } from "@material-ui/core";
+import { Button, Snackbar, Tooltip, Typography } from "@material-ui/core";
 import React from "react";
 import { AudioFile } from "../entities/AudioFile";
 import { selectAudioFile, selectAudioFiles } from "../lib/electron-helpers";
@@ -10,11 +10,15 @@ import { Header } from "./Header";
 interface IAppState {
   audioFiles: IAudioPlayerProps[];
   currentPage?: "player" | "classifications" | "labels";
+  snackBarOpen: boolean;
+  snackBarText: string;
 }
 
 export class App extends React.Component<any, IAppState> {
   public state: IAppState = {
     audioFiles: [],
+    snackBarOpen: false,
+    snackBarText: "",
   };
 
   public render() {
@@ -71,7 +75,14 @@ export class App extends React.Component<any, IAppState> {
           <Tooltip title="Export all labels to ~/reverb-export">
             <Button
               color="secondary"
-              onClick={AudioFile.exportAllLabels}
+              onClick={() =>
+                AudioFile.exportAllLabels().then((paths) =>
+                  this.setState({
+                    snackBarOpen: true,
+                    snackBarText: `${paths.length} files exported.`,
+                  }),
+                )
+              }
               fullWidth={true}
               size="small"
             >
@@ -88,6 +99,12 @@ export class App extends React.Component<any, IAppState> {
             <Typography variant="body1">Select audio file before to begin labelling</Typography>
           )}
         </main>
+        <Snackbar
+          anchorOrigin={{ vertical: "bottom", horizontal: "left" }}
+          open={this.state.snackBarOpen}
+          onClose={() => this.setState({ snackBarOpen: false })}
+          message={<span>{this.state.snackBarText}</span>}
+        />
       </div>
     );
   }
