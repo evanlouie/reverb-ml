@@ -7,6 +7,7 @@ import {
   TableRow,
   Tooltip,
 } from "@material-ui/core";
+import { SaveAlt } from "@material-ui/icons";
 import React from "react";
 import { Classification } from "../entities/Classification";
 import { Label } from "../entities/Label";
@@ -56,6 +57,7 @@ export class ClassificationTable extends React.PureComponent<{}> {
                 <TableCell>ID</TableCell>
                 <TableCell>Name</TableCell>
                 <TableCell>Label Count</TableCell>
+                <TableCell />
               </TableRow>
             </TableHead>
             <TableBody>
@@ -64,6 +66,17 @@ export class ClassificationTable extends React.PureComponent<{}> {
                   <TableCell>{id}</TableCell>
                   <TableCell>{name}</TableCell>
                   <TableCell>{labelCounts[id] || "---"}</TableCell>
+                  <TableCell>
+                    <Tooltip title={`Export all audio samples classified as: ${name}`}>
+                      <Button
+                        color="primary"
+                        size="small"
+                        onClick={() => Classification.export(id)}
+                      >
+                        <SaveAlt />
+                      </Button>
+                    </Tooltip>
+                  </TableCell>
                 </TableRow>
               ))}
             </TableBody>

@@ -18,8 +18,8 @@ import { Label } from "./Label";
 @Index(["basename", "dirname"], { unique: true })
 export class AudioFile extends BaseEntity {
   public static async exportAllLabels() {
-    const audioRepository = getRepository(AudioFile);
-    const audioFiles = await audioRepository.find({
+    const repository = this.getRepository();
+    const audioFiles = await repository.find({
       relations: ["labels", "labels.sampleData"], // Dont include labels.classification. It will be eager loaded from the model
     });
     const writes_ = Promise.all(
