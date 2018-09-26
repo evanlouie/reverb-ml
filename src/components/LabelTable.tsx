@@ -77,11 +77,7 @@ export class LabelTable extends React.Component<ILabelTableProps> {
     label,
     isPlaying = false,
   }) => {
-    const {
-      startTime,
-      endTime,
-      classification: { name },
-    } = label;
+    const { startTime, endTime } = label;
     const { classifications } = this.state;
     return (
       <TableRow selected={isPlaying}>
