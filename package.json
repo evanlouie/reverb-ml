@@ -29,8 +29,7 @@
           "zip"
         ],
         "linux": [
-          "deb",
-          "rpm"
+          "deb"
         ]
       },
       "electronPackagerConfig": {
@@ -40,7 +39,6 @@
         "name": "reverb_ml"
       },
       "electronInstallerDebian": {},
-      "electronInstallerRedhat": {},
       "github_repository": {
         "owner": "evanlouie",
         "name": "reverb-ml"
