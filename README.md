@@ -2,7 +2,11 @@
 
 > An Electron app to play, visualize, and annotate your audio files for machine learning
 
-Status: Pretty stable
+| Operating System | Status                                                                                                                                                                |
+| ---------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| MacOS            | [![Build Status](https://dev.azure.com/evanlouie/reverb-ml/_apis/build/status/Mac%20Build)](https://dev.azure.com/evanlouie/reverb-ml/_build/latest?definitionId=2)   |
+| Linux (Debian)   | [![Build Status](https://dev.azure.com/evanlouie/reverb-ml/_apis/build/status/Linux%20Build)](https://dev.azure.com/evanlouie/reverb-ml/_build/latest?definitionId=1) |
+| Windows          | Coming Soon                                                                                                                                                           |
 
 ## Quickstart
 
