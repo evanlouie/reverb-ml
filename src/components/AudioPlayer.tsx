@@ -193,6 +193,12 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
   public render() {
     const { wavesurfer, classifications } = this.state;
     const maxWidthRefStyles = { width: "100%", minWidth: "20vw" };
+
+    const classificationOption = ({ id, name }: Classification) => (
+      <option key={id} value={id}>
+        {name}
+      </option>
+    );
     return (
       // tslint:disable-next-line:jsx-no-lambda
       <div
@@ -213,11 +219,7 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
             <Tooltip title="Choose the Classification to create new labels with.">
               <Select native={true} fullWidth={true}>
                 {classifications.size === 0 && <option>No classifications found in system.</option>}
-                {classifications.map(({ id, name }) => (
-                  <option key={id} value={id}>
-                    {name}
-                  </option>
-                ))}
+                {classifications.map(classificationOption)}
               </Select>
             </Tooltip>
 
@@ -280,39 +282,9 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
             <LabelTable
               labels={this.state.labels}
               currentlyPlayingLabelIds={this.state.currentlyPlayingLabelIds}
-              playLabel={async ({ id: targetLabelId }: Label) =>
-                this.state.wavesurferRegionIdToLabelIdMap
-                  .filter((labelId) => labelId === targetLabelId)
-                  .map((_, regionId) => wavesurfer.regions.list[regionId])
-                  .take(1)
-                  .forEach((region) => {
-                    region.play();
-                  })
-              }
-              deleteLabel={async ({ id: targetLabelId }: Label) =>
-                this.state.wavesurferRegionIdToLabelIdMap
-                  .filter((labelId) => labelId === targetLabelId)
-                  .map((_, regionId) => wavesurfer.regions.list[regionId])
-                  .take(1)
-                  .forEach((region) => {
-                    region.remove();
-                  })
-              }
-              updateLabelClassification={async (label: Label, classification: Classification) => {
-                const { labels, wavesurferRegionIdToLabelIdMap } = this.state;
-                label.classification = classification;
-                const updatedLabel = await label.save();
-                const updateIndex = labels.findIndex(({ id: labelId }) => labelId === label.id);
-                wavesurferRegionIdToLabelIdMap
-                  .filter((labelId, _) => labelId === label.id)
-                  .map((_, regionId) => wavesurfer.regions.list[regionId])
-                  .take(1)
-                  .forEach((region) => {
-                    // BUG: wavesurfer doesn't update the color until the a redraw is triggered by interacting with waveform
-                    region.color = stringToRGBA(updatedLabel.classification.name);
-                  });
-                this.setState({ labels: this.state.labels.set(updateIndex, updatedLabel) });
-              }}
+              playLabel={this.handlePlayLabel}
+              deleteLabel={this.handleDeleteLabel}
+              updateLabelClassification={this.handleUpdateLabelClassification}
             />
           </div>
         )}
@@ -524,5 +496,58 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
   private wavesurfer = async () => {
     const { wavesurfer: ws } = this.state;
     return ws || Promise.reject("Wavesurfer not initialized");
+  };
+
+  private handlePlayLabel = async ({ id: targetLabelId }: Label) => {
+    const wavesurfer = await this.wavesurfer();
+    this.state.wavesurferRegionIdToLabelIdMap
+      .filter((labelId) => labelId === targetLabelId)
+      .map((_, regionId) => wavesurfer.regions.list[regionId])
+      .take(1)
+      .forEach((region) => {
+        region.play();
+      });
+  };
+
+  private handleDeleteLabel = async (label: Label) => {
+    const { id: targetLabelId } = label;
+    const wavesurfer = await this.wavesurfer();
+    this.state.wavesurferRegionIdToLabelIdMap
+      .filter((labelId) => labelId === targetLabelId)
+      .map((_, regionId) => wavesurfer.regions.list[regionId])
+      .take(1)
+      .forEach(async (region) => {
+        // Delete from state
+        const { labels } = this.state;
+        this.setState({
+          labels: labels.delete(labels.findIndex(({ id: labelId }) => labelId === targetLabelId)),
+        });
+        // Remove from DB
+        label.remove().then((deletedLabel) => {
+          console.log(`Label ${deletedLabel.id} removed.`);
+        });
+        // Remove from wavesurfer
+        region.remove();
+      });
+  };
+
+  private handleUpdateLabelClassification = async (
+    label: Label,
+    classification: Classification,
+  ) => {
+    const wavesurfer = await this.wavesurfer();
+    const { labels, wavesurferRegionIdToLabelIdMap } = this.state;
+    label.classification = classification;
+    const updatedLabel = await label.save();
+    const updateIndex = labels.findIndex(({ id: labelId }) => labelId === label.id);
+    wavesurferRegionIdToLabelIdMap
+      .filter((labelId, _) => labelId === label.id)
+      .map((_, regionId) => wavesurfer.regions.list[regionId])
+      .take(1)
+      .forEach((region) => {
+        // BUG: wavesurfer doesn't update the color until the a redraw is triggered by interacting with waveform
+        region.color = stringToRGBA(updatedLabel.classification.name);
+      });
+    this.setState({ labels: this.state.labels.set(updateIndex, updatedLabel) });
   };
 }
