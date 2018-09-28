@@ -1,7 +1,7 @@
 {
   "name": "reverb-ml",
   "productName": "reverb-ml",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "An Electron app to play, visualize, and annotate your audio files for machine learning",
   "main": "src/index.ts",
   "scripts": {
