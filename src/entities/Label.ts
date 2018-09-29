@@ -8,19 +8,12 @@ import {
   OneToOne,
   PrimaryGeneratedColumn,
 } from "typeorm";
-import { promisify } from "util";
 import { AudioFile } from "./AudioFile";
 import { Classification } from "./Classification";
 import { DataBlob } from "./DataBlob";
 
 @Entity()
 export class Label extends BaseEntity {
-  public static async exportLabels() {
-    const labels = await Label.find();
-    await promisify(writeFile)("db.json", JSON.stringify(labels), { encoding: "utf8" });
-    console.log("WROTE OUT FILES");
-  }
-
   @PrimaryGeneratedColumn()
   public id!: number;
 
@@ -33,10 +26,11 @@ export class Label extends BaseEntity {
   @ManyToOne((type) => Classification, (classification) => classification.labels, {
     nullable: false,
     eager: true,
+    onDelete: "CASCADE",
   })
   public classification!: Classification;
 
-  @OneToOne((type) => DataBlob, { nullable: false })
+  @OneToOne((type) => DataBlob, { nullable: false, onDelete: "CASCADE" })
   @JoinColumn()
   public sampleData!: DataBlob;
 

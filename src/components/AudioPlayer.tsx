@@ -3,7 +3,6 @@ import {
   AddComment,
   CloudDownload,
   GraphicEq,
-  LabelImportant,
   Pause,
   PlayArrowRounded,
   ZoomIn,
@@ -87,9 +86,13 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
    */
   public async componentDidMount() {
     const { audioFile_, zoom: minPxPerSec, audioUrl } = this.state;
-    Classification.find().then((classifications) =>
-      this.setState({ classifications: this.state.classifications.concat(classifications) }),
-    );
+    Classification.find().then((classificationsArr) => {
+      const classifications = this.state.classifications.concat(classificationsArr);
+      this.setState({
+        classifications,
+        classification: classifications.first({ name: "default" }).name,
+      });
+    });
     const audioFile = await audioFile_;
     const labels = await audioFile
       .getLabels()
@@ -125,48 +128,50 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
       console.info("Wavesurfer ready");
       wavesurfer.on("region-created", this.handleWavesurferRegionCreate);
       wavesurfer.on("region-in", async ({ id: regionId }: Region) => {
-        const correspondingLabelId = this.state.wavesurferRegionIdToLabelIdMap.get(regionId);
-        correspondingLabelId
-          ? this.setState({
-              currentlyPlayingLabelIds: this.state.currentlyPlayingLabelIds.add(
-                correspondingLabelId,
-              ),
-            })
-          : console.error(`Failed to find corresponding label Id for region ${regionId}`);
+        this.state.wavesurferRegionIdToLabelIdMap
+          .filter((_, possibleRegionId) => possibleRegionId === regionId)
+          .take(1)
+          .forEach((labelId, _) => {
+            this.setState({
+              currentlyPlayingLabelIds: this.state.currentlyPlayingLabelIds.add(labelId),
+            });
+          });
       });
       wavesurfer.on("region-out", async ({ id: regionId }: Region) => {
-        const correspondingLabelId = this.state.wavesurferRegionIdToLabelIdMap.get(regionId);
-        correspondingLabelId
-          ? this.setState({
-              currentlyPlayingLabelIds: this.state.currentlyPlayingLabelIds.remove(
-                correspondingLabelId,
-              ),
-            })
-          : console.error(`Failed to find corresponding label Id for region ${regionId}`);
+        this.state.wavesurferRegionIdToLabelIdMap
+          .filter((_, possibleRegionId) => possibleRegionId === regionId)
+          .take(1)
+          .forEach((labelId, _) => {
+            this.setState({
+              currentlyPlayingLabelIds: this.state.currentlyPlayingLabelIds.delete(labelId),
+            });
+          });
       });
       wavesurfer.on("region-updated", async ({ id: regionId }: Region) => {
-        console.info(`Updating region ${regionId}`);
+        // console.info(`Updating region ${regionId}`);
       });
-      wavesurfer.on("region-update-end", async ({ id: regionId, start, end }: Region) => {
-        console.info(`Updating region position ${regionId}`);
-        const correspondingLabelId = this.state.wavesurferRegionIdToLabelIdMap.get(regionId);
-        const correspondingLabelIndex = this.state.labels.findIndex(
-          ({ id: labelId }) => labelId === correspondingLabelId,
-        );
-        const correspondingLabel = await Label.findOne({ id: correspondingLabelId });
-        if (correspondingLabel) {
-          correspondingLabel.startTime = start;
-          correspondingLabel.endTime = end;
-          const updatedLabel = await correspondingLabel.save();
-          this.setState({
-            labels: this.state.labels
-              .set(correspondingLabelIndex, updatedLabel)
-              .sort((a, b) => a.startTime - b.startTime),
+      wavesurfer.on("region-update-end", async ({ id: targetRegionId, start, end }: Region) => {
+        console.info(`Updating region position ${targetRegionId}`);
+        this.state.wavesurferRegionIdToLabelIdMap
+          .filter((_, possibleRegionId) => possibleRegionId === targetRegionId)
+          .map((labelId) => this.state.labels.findIndex(({ id }) => id === labelId))
+          .filter((labelIndex) => labelIndex >= 0)
+          .map<[number, Label]>((labelIndex) => [
+            labelIndex,
+            this.state.labels.get(labelIndex) as Label,
+          ])
+          .take(1)
+          .forEach(([labelIndex, label]) => {
+            label.startTime = start;
+            label.endTime = end;
+            label.save().then((updatedLabel) => {
+              this.setState({
+                labels: this.state.labels
+                  .set(labelIndex, updatedLabel)
+                  .sort((a, b) => a.startTime - b.startTime),
+              });
+            });
           });
-          return updatedLabel;
-        } else {
-          return Promise.reject(new Error(`Failed to find Label with id ${correspondingLabelId}`));
-        }
       });
       wavesurfer.on("region-dblclick", async (region: Region) => {
         // BUG: calling region.play() continues to play after exiting the region
@@ -195,7 +200,7 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
     const maxWidthRefStyles = { width: "100%", minWidth: "20vw" };
 
     const classificationOption = ({ id, name }: Classification) => (
-      <option key={id} value={id}>
+      <option key={id} value={name}>
         {name}
       </option>
     );
@@ -217,7 +222,11 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
         >
           <Paper>
             <Tooltip title="Choose the Classification to create new labels with.">
-              <Select native={true} fullWidth={true}>
+              <Select
+                native={true}
+                fullWidth={true}
+                onChange={(e) => this.setState({ classification: e.target.value })}
+              >
                 {classifications.size === 0 && <option>No classifications found in system.</option>}
                 {classifications.map(classificationOption)}
               </Select>
@@ -398,6 +407,7 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
 
   private handleAddLabel = async () => {
     const { classification } = this.state;
+    console.log(classification);
     return this.wavesurfer().then((ws) =>
       this.addLabel({ startTime: ws.getCurrentTime(), classification }),
     );

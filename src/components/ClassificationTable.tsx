@@ -7,8 +7,9 @@ import {
   TableRow,
   Tooltip,
 } from "@material-ui/core";
-import { SaveAlt } from "@material-ui/icons";
+import { Delete, SaveAlt } from "@material-ui/icons";
 import React from "react";
+import { NotificationContext } from "../contexts/NotificationContext";
 import { Classification } from "../entities/Classification";
 import { Label } from "../entities/Label";
 import { getDBConnection } from "../lib/database";
@@ -37,7 +38,7 @@ export class ClassificationTable extends React.PureComponent<{}> {
       >
         <div style={{ display: "flex", flexDirection: "row", flexWrap: "nowrap" }}>
           <Tooltip title="Add a Classification">
-            <ClassificationFormDialog />
+            <ClassificationFormDialog afterCreate={(_) => this.refreshClassifications()} />
           </Tooltip>
           <Tooltip title="Refresh table">
             <Button
@@ -61,24 +62,59 @@ export class ClassificationTable extends React.PureComponent<{}> {
               </TableRow>
             </TableHead>
             <TableBody>
-              {classifications.map(({ id, name }) => (
-                <TableRow key={id}>
-                  <TableCell>{id}</TableCell>
-                  <TableCell>{name}</TableCell>
-                  <TableCell>{labelCounts[id] || "---"}</TableCell>
-                  <TableCell>
-                    <Tooltip title={`Export all audio samples classified as: ${name}`}>
-                      <Button
-                        color="primary"
-                        size="small"
-                        onClick={() => Classification.export(id)}
-                      >
-                        <SaveAlt />
-                      </Button>
-                    </Tooltip>
-                  </TableCell>
-                </TableRow>
-              ))}
+              {classifications.map((classification) => {
+                const { id, name } = classification;
+                return (
+                  <TableRow key={id}>
+                    <TableCell>{id}</TableCell>
+                    <TableCell>{name}</TableCell>
+                    <TableCell>{labelCounts[id] || "---"}</TableCell>
+                    <TableCell>
+                      <NotificationContext.Consumer>
+                        {({ notify }) => (
+                          <div
+                            style={{ display: "flex", flexDirection: "row", flexWrap: "nowrap" }}
+                          >
+                            <Tooltip title={`Export all audio samples classified as: ${name}`}>
+                              <Button
+                                color="primary"
+                                size="small"
+                                onClick={() => {
+                                  Classification.export(id);
+                                  notify(
+                                    `Classification ${classification.name} successfully exported.`,
+                                  );
+                                }}
+                              >
+                                <SaveAlt />
+                              </Button>
+                            </Tooltip>
+                            <Tooltip
+                              title={`Delete the ${name} Classification. Warning! will delete all associated labels.`}
+                            >
+                              <Button
+                                color="secondary"
+                                size="small"
+                                onClick={async () => {
+                                  await classification.remove();
+                                  this.refreshClassifications();
+                                  notify(
+                                    `Classification "${
+                                      classification.name
+                                    }" and all associated labels have been deleted.`,
+                                  );
+                                }}
+                              >
+                                <Delete />
+                              </Button>
+                            </Tooltip>
+                          </div>
+                        )}
+                      </NotificationContext.Consumer>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
             </TableBody>
           </Table>
         </div>

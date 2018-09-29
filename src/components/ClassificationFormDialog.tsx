@@ -8,9 +8,14 @@ import {
   TextField,
 } from "@material-ui/core";
 import React from "react";
+import { NotificationContext } from "../contexts/NotificationContext";
 import { Classification } from "../entities/Classification";
 
-export class ClassificationFormDialog extends React.PureComponent {
+interface IClassificationFormDialogProps {
+  afterCreate: (c: Classification) => Promise<any>;
+}
+
+export class ClassificationFormDialog extends React.PureComponent<IClassificationFormDialogProps> {
   public state = {
     open: false,
     nameField: "",
@@ -49,18 +54,33 @@ export class ClassificationFormDialog extends React.PureComponent {
             <Button onClick={this.handleClose} color="primary">
               Cancel
             </Button>
-            <Button onClick={this.handleCreate} color="primary">
-              Create
-            </Button>
+            <NotificationContext.Consumer>
+              {({ notify }) => (
+                <Button
+                  onClick={async () => {
+                    return Classification.create({
+                      name: this.state.nameField,
+                    })
+                      .save()
+                      .then((c) => {
+                        this.setState({ open: false, nameField: "" });
+                        notify(`Classification ${c.name} was successfully added.`);
+                        return c;
+                      })
+                      .then(this.props.afterCreate)
+                      .catch((err) => {
+                        notify(err);
+                      });
+                  }}
+                  color="primary"
+                >
+                  Create
+                </Button>
+              )}
+            </NotificationContext.Consumer>
           </DialogActions>
         </Dialog>
       </div>
     );
   }
-
-  private handleCreate = async () => {
-    const classification = Classification.create({ name: this.state.nameField }).save();
-    this.setState({ open: false, nameField: "" });
-    return classification;
-  };
 }
