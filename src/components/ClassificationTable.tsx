@@ -1,36 +1,45 @@
 import {
+  AppBar,
   Button,
+  Dialog,
+  IconButton,
   Table,
   TableBody,
   TableCell,
   TableHead,
   TableRow,
+  Toolbar,
   Tooltip,
-} from "@material-ui/core";
-import { Delete, SaveAlt } from "@material-ui/icons";
-import React from "react";
-import { NotificationContext } from "../contexts/NotificationContext";
-import { Classification } from "../entities/Classification";
-import { Label } from "../entities/Label";
-import { getDBConnection } from "../lib/database";
-import { ClassificationFormDialog } from "./ClassificationFormDialog";
+  Typography,
+} from "@material-ui/core"
+import { Close, Delete, OpenInNew, SaveAlt } from "@material-ui/icons"
+import { List, Set } from "immutable"
+import React from "react"
+import { NotificationContext } from "../contexts/NotificationContext"
+import { Classification } from "../entities/Classification"
+import { Label } from "../entities/Label"
+import { getDBConnection } from "../lib/database"
+import { ClassificationFormDialog } from "./ClassificationFormDialog"
+import { LabelTable } from "./LabelTable"
 
-export class ClassificationTable extends React.PureComponent<{}> {
+export class ClassificationTable extends React.PureComponent {
   public state: {
-    classifications: Classification[];
-    labelCounts: { [classificationId: number]: number };
+    classifications: Classification[]
+    labelCounts: { [classificationId: number]: number }
+    expandedClassification: number
   } = {
     classifications: [],
     labelCounts: {},
-  };
+    expandedClassification: -1,
+  }
 
   public async componentDidMount() {
-    await getDBConnection();
-    this.refreshClassifications();
+    await getDBConnection()
+    this.refreshClassifications()
   }
 
   public render() {
-    const { classifications, labelCounts } = this.state;
+    const { classifications, labelCounts } = this.state
     return (
       <div
         className="ClassificationTable"
@@ -63,7 +72,7 @@ export class ClassificationTable extends React.PureComponent<{}> {
             </TableHead>
             <TableBody>
               {classifications.map((classification) => {
-                const { id, name } = classification;
+                const { id, name } = classification
                 return (
                   <TableRow key={id}>
                     <TableCell>{id}</TableCell>
@@ -80,10 +89,10 @@ export class ClassificationTable extends React.PureComponent<{}> {
                                 color="primary"
                                 size="small"
                                 onClick={() => {
-                                  Classification.export(id);
+                                  Classification.export(id)
                                   notify(
                                     `Classification ${classification.name} successfully exported.`,
-                                  );
+                                  )
                                 }}
                               >
                                 <SaveAlt />
@@ -96,41 +105,161 @@ export class ClassificationTable extends React.PureComponent<{}> {
                                 color="secondary"
                                 size="small"
                                 onClick={async () => {
-                                  await classification.remove();
-                                  this.refreshClassifications();
+                                  await classification.remove()
+                                  this.refreshClassifications()
                                   notify(
                                     `Classification "${
                                       classification.name
                                     }" and all associated labels have been deleted.`,
-                                  );
+                                  )
                                 }}
                               >
                                 <Delete />
                               </Button>
+                            </Tooltip>
+                            <Tooltip title={`View labels classified as ${name}`}>
+                              <LabelTableModal
+                                classification={classification}
+                                onClose={() => this.refreshClassifications()}
+                              />
                             </Tooltip>
                           </div>
                         )}
                       </NotificationContext.Consumer>
                     </TableCell>
                   </TableRow>
-                );
+                )
               })}
             </TableBody>
           </Table>
         </div>
       </div>
-    );
+    )
   }
 
   private refreshClassifications = async () => {
-    const classifications = await Classification.find();
+    const classifications = await Classification.find()
     classifications.forEach(async (classification) => {
-      const labelCount = await Label.count({ classification });
+      const labelCount = await Label.count({ classification })
       this.setState({
         labelCounts: { ...this.state.labelCounts, [classification.id]: labelCount },
-      });
-    });
-    this.setState({ classifications });
-    return classifications;
-  };
+      })
+    })
+    this.setState({ classifications })
+    return classifications
+  }
+}
+
+// tslint:disable-next-line:max-classes-per-file
+class LabelTableModal extends React.PureComponent<{
+  classification: Classification
+  onClose?: () => Promise<any>
+}> {
+  public static defaultProps = {
+    onClose: async () => "",
+  }
+
+  public state: { isOpen: boolean; labels: List<Label>; currentlyPlayingLabelIds: Set<number> } = {
+    isOpen: false,
+    labels: List(),
+    currentlyPlayingLabelIds: Set(),
+  }
+
+  public async componentDidMount() {
+    const { classification } = this.props
+    const labels = await Label.find({ classification })
+    this.setState({ labels: List(labels) })
+  }
+
+  public render() {
+    const {
+      classification: { name },
+    } = this.props
+    const { isOpen, labels, currentlyPlayingLabelIds } = this.state
+    return (
+      <div className="LabelTableModal">
+        <Button color="primary" size="small" onClick={async () => this.setState({ isOpen: true })}>
+          <OpenInNew />
+        </Button>
+        <Dialog fullScreen={true} open={isOpen} onClose={this.handleClose}>
+          <AppBar>
+            <Toolbar>
+              <IconButton color="inherit" onClick={this.handleClose} aria-label="Close">
+                <Close />
+              </IconButton>
+              <Typography variant="title" color="inherit">
+                {name}
+              </Typography>
+            </Toolbar>
+          </AppBar>
+          <div style={{ paddingTop: "4em" }}>
+            <LabelTable
+              labels={labels}
+              currentlyPlayingLabelIds={currentlyPlayingLabelIds}
+              playLabel={async (label: Label) => {
+                Label.getRepository()
+                  .find({ relations: ["sampleData"], where: { id: label.id } })
+                  .then((labelsWithSample) => {
+                    labelsWithSample.forEach(async (labelWithSample) => {
+                      const blob = await new Response(labelWithSample.sampleData.blob).blob()
+                      const url = URL.createObjectURL(blob)
+                      const audio = new Audio(url)
+                      audio.play()
+                    })
+                  })
+              }}
+              deleteLabel={async (targetLabel: Label) => {
+                Label.getRepository()
+                  .find({ relations: ["sampleData"], where: { id: targetLabel.id } })
+                  .then((labelsWithSample) => {
+                    labelsWithSample.forEach((labelWithSample) => {
+                      const { sampleData } = labelWithSample
+                      labelWithSample
+                        .remove()
+                        .then((_) => sampleData.remove())
+                        .then((_) => {
+                          this.setState({
+                            labels: this.state.labels.filter((l) => l.id !== targetLabel.id),
+                          })
+                        })
+                    })
+                  })
+              }}
+              updateLabelClassification={async (
+                targetLabel: Label,
+                classification: Classification,
+              ) => {
+                Label.getRepository()
+                  .find({ where: { id: targetLabel.id } })
+                  .then((matchingLabels) => {
+                    matchingLabels.forEach((label) => {
+                      label.classification = classification
+                      label.save().then((updatedLabel) => {
+                        this.setState({
+                          labels: this.state.labels.filter((l) => l.id !== updatedLabel.id),
+                        })
+                      })
+                    })
+                  })
+              }}
+            />
+          </div>
+        </Dialog>
+      </div>
+    )
+  }
+
+  private handleClose = () => {
+    this.setState(
+      {
+        isOpen: false,
+      },
+      () => {
+        const { onClose } = this.props
+        if (onClose) {
+          onClose()
+        }
+      },
+    )
+  }
 }

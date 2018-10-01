@@ -2,7 +2,7 @@
  * General Electron helper functions
  */
 // tslint:disable-next-line
-import { remote } from "electron";
+import { remote } from "electron"
 
 /**
  * @see https://www.chromium.org/audio-video
@@ -19,7 +19,7 @@ const supportedChromiumExtensions: string[] = [
   "opus",
   "webm",
   "wav",
-];
+]
 
 export const selectFiles = (): Promise<string[]> =>
   new Promise((resolve) =>
@@ -28,7 +28,7 @@ export const selectFiles = (): Promise<string[]> =>
       { properties: ["openFile", "multiSelections"] },
       (files) => resolve(files || []),
     ),
-  );
+  )
 
 /**
  * Show a single file selector with only Chromium supported media extensions
@@ -47,7 +47,7 @@ export const selectMediaFile = ({ filter = (extension: string) => true } = {}): 
       },
       (files) => resolve(files || []),
     ),
-  );
+  )
 
 /**
  * Show a file selector with only Chromium supported audio extensions.
@@ -55,9 +55,9 @@ export const selectMediaFile = ({ filter = (extension: string) => true } = {}): 
 export const selectAudioFile = () =>
   selectMediaFile({
     filter: (ext) => ["mp4", "ogv", "webm"].includes(ext) === false,
-  });
+  })
 
 /**
  * @see https://github.com/electron/electron/blob/master/docs/api/app.md#appgetpathname
  */
-export const getPath = (name: string): string => remote.app.getPath(name);
+export const getPath = (name: string): string => remote.app.getPath(name)
