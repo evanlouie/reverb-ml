@@ -490,8 +490,10 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
       .save()
       .then((l) => {
         const { labels, wavesurferRegionIdToLabelIdMap } = this.state;
+        // Find index to insert into to maintain sorted list; assumes list is already sorted
+        const targetIndex = labels.findIndex((neighbor) => neighbor.startTime > l.startTime);
         this.setState({
-          labels: labels.push(l),
+          labels: labels.insert(targetIndex >= 0 ? targetIndex : labels.size, l),
           wavesurferRegionIdToLabelIdMap: wavesurferRegionIdToLabelIdMap.set(region.id, l.id),
         });
         return l;

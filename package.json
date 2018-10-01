@@ -50,12 +50,12 @@
     }
   },
   "dependencies": {
-    "@material-ui/core": "^3.1.1",
+    "@material-ui/core": "^3.1.2",
     "@material-ui/icons": "^3.0.1",
-    "@types/electron-devtools-installer": "^2.0.2",
+    "@types/electron-devtools-installer": "^2.2.0",
     "@types/fs-extra": "^5.0.4",
     "@types/react": "^16.4.14",
-    "@types/react-dom": "^16.0.7",
+    "@types/react-dom": "^16.0.8",
     "electron-compile": "^6.4.3",
     "electron-devtools-installer": "^2.1.0",
     "electron-squirrel-startup": "^1.0.0",
@@ -67,10 +67,10 @@
     "reflect-metadata": "^0.1.12",
     "sqlite3": "^4.0.2",
     "typeorm": "^0.2.7",
-    "wavesurfer.js": "^2.0.6"
+    "wavesurfer.js": "^2.1.0"
   },
   "devDependencies": {
-    "@types/node": "^10.10.3",
+    "@types/node": "^10.11.3",
     "babel-plugin-transform-async-to-generator": "^6.24.1",
     "babel-preset-env": "^1.7.0",
     "babel-preset-react": "^6.24.1",
@@ -80,7 +80,7 @@
     "tslint": "^5.1.0",
     "tslint-config-prettier": "^1.15.0",
     "tslint-react": "^3.6.0",
-    "typescript": "~3.0.3"
+    "typescript": "~3.1.1"
   },
   "prettier": {
     "printWidth": 100,
