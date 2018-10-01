@@ -1,27 +1,27 @@
-import { Button, Snackbar, Tooltip, Typography } from "@material-ui/core";
-import React from "react";
-import { NotificationContext } from "../contexts/NotificationContext";
-import { AudioFile } from "../entities/AudioFile";
-import { selectMediaFile } from "../lib/electron-helpers";
-import { readFileAsBlob } from "../lib/filesystem";
-import { AudioPlayer, IAudioPlayerProps } from "./AudioPlayer";
-import { ClassificationTable } from "./ClassificationTable";
-import { Header } from "./Header";
+import { Button, Snackbar, Tooltip, Typography } from "@material-ui/core"
+import React from "react"
+import { NotificationContext } from "../contexts/NotificationContext"
+import { AudioFile } from "../entities/AudioFile"
+import { selectMediaFile } from "../lib/electron-helpers"
+import { readFileAsBlob } from "../lib/filesystem"
+import { AudioPlayer, IAudioPlayerProps } from "./AudioPlayer"
+import { ClassificationTable } from "./ClassificationTable"
+import { Header } from "./Header"
 
 interface IAppState {
-  mediaFiles: IAudioPlayerProps[];
-  currentPage?: "player" | "classifications" | "labels";
+  mediaFiles: IAudioPlayerProps[]
+  currentPage?: "player" | "classifications" | "labels"
 }
 
 const defaultState: IAppState = {
   mediaFiles: [],
-};
+}
 
 export class App extends React.Component<any, IAppState> {
-  public state: IAppState = defaultState;
+  public state: IAppState = defaultState
 
   public render() {
-    const { mediaFiles, currentPage } = this.state;
+    const { mediaFiles, currentPage } = this.state
     return (
       <NotificationContext>
         <div
@@ -54,7 +54,7 @@ export class App extends React.Component<any, IAppState> {
               <Button
                 color="primary"
                 onClick={() => {
-                  this.setState({ currentPage: "classifications" });
+                  this.setState({ currentPage: "classifications" })
                 }}
                 fullWidth={true}
                 size="small"
@@ -114,24 +114,24 @@ export class App extends React.Component<any, IAppState> {
           </NotificationContext.Consumer>
         </div>
       </NotificationContext>
-    );
+    )
   }
 
   private selectAudio = async () => {
-    const filepaths = await selectMediaFile();
+    const filepaths = await selectMediaFile()
     const mediaFiles: IAudioPlayerProps[] = await Promise.all(
       filepaths.map(async (filepath) => {
-        const audioBlob = await readFileAsBlob(filepath);
+        const audioBlob = await readFileAsBlob(filepath)
         return {
           audioBlob,
           filepath,
-        };
+        }
       }),
-    );
+    )
     if (mediaFiles.length > 0) {
-      this.setState({ mediaFiles, currentPage: "player" });
+      this.setState({ mediaFiles, currentPage: "player" })
     } else {
-      this.setState({ currentPage: undefined });
+      this.setState({ currentPage: undefined })
     }
-  };
+  }
 }

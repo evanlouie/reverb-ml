@@ -6,48 +6,48 @@ import {
   TableHead,
   TableRow,
   Tooltip,
-} from "@material-ui/core";
-import { Delete, PlayArrow } from "@material-ui/icons";
-import { List, Map, Set } from "immutable";
-import React, { StatelessComponent } from "react";
-import { Classification } from "../entities/Classification";
-import { Label } from "../entities/Label";
-import { stringToRGBA } from "../lib/colour";
+} from "@material-ui/core"
+import { Delete, PlayArrow } from "@material-ui/icons"
+import { List, Map, Set } from "immutable"
+import React, { StatelessComponent } from "react"
+import { Classification } from "../entities/Classification"
+import { Label } from "../entities/Label"
+import { stringToRGBA } from "../lib/colour"
 
-interface ILabelTableProps {
-  labels: List<Label>;
-  currentlyPlayingLabelIds: Set<number>;
-  playLabel: (label: Label) => Promise<any>;
-  deleteLabel: (label: Label) => Promise<any>;
-  updateLabelClassification: (label: Label, classification: Classification) => Promise<any>;
+export interface ILabelTableProps {
+  labels: List<Label>
+  currentlyPlayingLabelIds: Set<number>
+  playLabel: (label: Label) => Promise<any>
+  deleteLabel: (label: Label) => Promise<any>
+  updateLabelClassification: (label: Label, classification: Classification) => Promise<any>
 }
 export class LabelTable extends React.PureComponent<ILabelTableProps> {
   public state = {
     classifications: Object.values(
       this.props.labels.reduce<{ [id: number]: Classification }>((classifications, label) => {
-        return { ...classifications, [label.classification.id]: label.classification };
+        return { ...classifications, [label.classification.id]: label.classification }
       }, {}),
     ),
-  };
+  }
 
-  private scrollIntoViewRefs: HTMLElement[] = [];
+  private scrollIntoViewRefs: HTMLElement[] = []
 
   public async componentDidMount() {
-    const classifications = await Classification.find();
-    this.setState({ classifications });
+    const classifications = await Classification.find()
+    this.setState({ classifications })
   }
 
   public async componentDidUpdate() {
     // Ensure the first label in always in view
     if (this.scrollIntoViewRefs.length > 0) {
       // behavior: "center" breaks scrollIntoView when having to scroll between many objects.
-      this.scrollIntoViewRefs[0].scrollIntoView({ block: "center" });
+      this.scrollIntoViewRefs[0].scrollIntoView({ block: "center" })
     }
   }
 
   public render() {
-    this.scrollIntoViewRefs = [];
-    const { labels, currentlyPlayingLabelIds } = this.props;
+    this.scrollIntoViewRefs = []
+    const { labels, currentlyPlayingLabelIds } = this.props
     return (
       <div className="LabelTable">
         <Table>
@@ -70,15 +70,15 @@ export class LabelTable extends React.PureComponent<ILabelTableProps> {
           </TableBody>
         </Table>
       </div>
-    );
+    )
   }
 
   private LabelTableRow: StatelessComponent<{ label: Label; isPlaying?: boolean }> = ({
     label,
     isPlaying = false,
   }) => {
-    const { startTime, endTime } = label;
-    const { classifications } = this.state;
+    const { startTime, endTime } = label
+    const { classifications } = this.state
     return (
       <TableRow selected={isPlaying}>
         <TableCell>
@@ -106,13 +106,13 @@ export class LabelTable extends React.PureComponent<ILabelTableProps> {
           </div>
         </TableCell>
       </TableRow>
-    );
-  };
+    )
+  }
 
   private handlePlayLabel = (label: Label) => (_: React.MouseEvent<HTMLElement>) =>
-    this.props.playLabel(label);
+    this.props.playLabel(label)
   private handleDeleteLabel = (label: Label) => (_: React.MouseEvent<HTMLElement>) =>
-    this.props.deleteLabel(label);
+    this.props.deleteLabel(label)
 }
 
 // A helper class so that we can use forceUpdate after updating the label.
@@ -120,13 +120,13 @@ export class LabelTable extends React.PureComponent<ILabelTableProps> {
 // nested object which is being changed.
 // tslint:disable-next-line:max-classes-per-file
 class ClassificationSelect extends React.PureComponent<{
-  classifications: Classification[];
-  label: Label;
-  updateLabelClassification: (label: Label, classification: Classification) => Promise<any>;
+  classifications: Classification[]
+  label: Label
+  updateLabelClassification: (label: Label, classification: Classification) => Promise<any>
 }> {
   public render() {
-    const { label, classifications } = this.props;
-    const { id: classificationId, name: classificationName } = label.classification;
+    const { label, classifications } = this.props
+    const { id: classificationId, name: classificationName } = label.classification
     return (
       <span style={{ display: "flex", flexWrap: "nowrap", alignItems: "center" }}>
         <select
@@ -147,22 +147,23 @@ class ClassificationSelect extends React.PureComponent<{
           ●
         </span>
       </span>
-    );
+    )
   }
 
   private handleClassificationChange = (label: Label) => async ({
     target: { value },
   }: React.ChangeEvent<HTMLSelectElement>) => {
-    const classification = this.props.classifications.find((c) => c.id.toString() === value);
+    const classification = this.props.classifications.find((c) => c.id.toString() === value)
     if (classification) {
       console.info(
         `Updating label from classification ${label.classification.id} to ${classification.id}`,
-      );
-      await this.props.updateLabelClassification(label, classification);
-      this.forceUpdate();
-      return classification;
+      )
+      this.props.updateLabelClassification(label, classification).then(() => {
+        this.forceUpdate()
+      })
+      return classification
     } else {
-      return Promise.reject(`Unable to find Classification with id ${label.classification.id}`);
+      return Promise.reject(`Unable to find Classification with id ${label.classification.id}`)
     }
-  };
+  }
 }

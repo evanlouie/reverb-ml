@@ -6,28 +6,28 @@ import {
   DialogContentText,
   DialogTitle,
   TextField,
-} from "@material-ui/core";
-import React from "react";
-import { NotificationContext } from "../contexts/NotificationContext";
-import { Classification } from "../entities/Classification";
+} from "@material-ui/core"
+import React from "react"
+import { NotificationContext } from "../contexts/NotificationContext"
+import { Classification } from "../entities/Classification"
 
 interface IClassificationFormDialogProps {
-  afterCreate: (c: Classification) => Promise<any>;
+  afterCreate: (c: Classification) => Promise<any>
 }
 
 export class ClassificationFormDialog extends React.PureComponent<IClassificationFormDialogProps> {
   public state = {
     open: false,
     nameField: "",
-  };
+  }
 
   public handleClickOpen = () => {
-    this.setState({ open: true });
-  };
+    this.setState({ open: true })
+  }
 
   public handleClose = () => {
-    this.setState({ open: false });
-  };
+    this.setState({ open: false })
+  }
 
   public render() {
     return (
@@ -63,14 +63,14 @@ export class ClassificationFormDialog extends React.PureComponent<IClassificatio
                     })
                       .save()
                       .then((c) => {
-                        this.setState({ open: false, nameField: "" });
-                        notify(`Classification ${c.name} was successfully added.`);
-                        return c;
+                        this.setState({ open: false, nameField: "" })
+                        notify(`Classification ${c.name} was successfully added.`)
+                        return c
                       })
                       .then(this.props.afterCreate)
                       .catch((err) => {
-                        notify(err);
-                      });
+                        notify(err)
+                      })
                   }}
                   color="primary"
                 >
@@ -81,6 +81,6 @@ export class ClassificationFormDialog extends React.PureComponent<IClassificatio
           </DialogActions>
         </Dialog>
       </div>
-    );
+    )
   }
 }
