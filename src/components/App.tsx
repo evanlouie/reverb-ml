@@ -62,16 +62,6 @@ export class App extends React.Component<any, IAppState> {
                 Classifications
               </Button>
             </Tooltip>
-
-            <Button
-              color="secondary"
-              onClick={this.selectAudio}
-              fullWidth={true}
-              size="small"
-              disabled={true}
-            >
-              Labels
-            </Button>
             <Tooltip title="Export all labels to ~/reverb-export">
               <NotificationContext.Consumer>
                 {({ notify }) => (
