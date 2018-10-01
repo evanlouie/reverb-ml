@@ -21,7 +21,7 @@ interface ILabelTableProps {
   deleteLabel: (label: Label) => Promise<any>;
   updateLabelClassification: (label: Label, classification: Classification) => Promise<any>;
 }
-export class LabelTable extends React.Component<ILabelTableProps> {
+export class LabelTable extends React.PureComponent<ILabelTableProps> {
   public state = {
     classifications: Object.values(
       this.props.labels.reduce<{ [id: number]: Classification }>((classifications, label) => {
