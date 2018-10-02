@@ -45,9 +45,9 @@ export class App extends React.Component<any, IAppState> {
             className="sidebar"
             style={{ gridArea: "sidebar", borderRight: "1px lightgrey solid" }}
           >
-            <Tooltip title="Browse filesystem for valid audio files">
+            <Tooltip title="Browse filesystem for valid media files">
               <Button color="primary" onClick={this.selectAudio} fullWidth={true} size="small">
-                Label Audio File
+                Label Audio/Video File
               </Button>
             </Tooltip>
             <Tooltip title="Manage Classifications in system">

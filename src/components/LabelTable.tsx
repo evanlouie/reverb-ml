@@ -1,5 +1,11 @@
 import {
   Button,
+  IconButton,
+  List as MaterialList,
+  ListItem,
+  ListItemSecondaryAction,
+  ListItemText,
+  ListSubheader,
   Table,
   TableBody,
   TableCell,
@@ -8,7 +14,7 @@ import {
   Tooltip,
 } from "@material-ui/core"
 import { Delete, PlayArrow } from "@material-ui/icons"
-import { List, Map, Set } from "immutable"
+import { List, Set } from "immutable"
 import React, { StatelessComponent } from "react"
 import { Classification } from "../entities/Classification"
 import { Label } from "../entities/Label"
@@ -20,6 +26,7 @@ export interface ILabelTableProps {
   playLabel: (label: Label) => Promise<any>
   deleteLabel: (label: Label) => Promise<any>
   updateLabelClassification: (label: Label, classification: Classification) => Promise<any>
+  compact?: boolean
 }
 export class LabelTable extends React.PureComponent<ILabelTableProps> {
   public state = {
@@ -47,28 +54,47 @@ export class LabelTable extends React.PureComponent<ILabelTableProps> {
 
   public render() {
     this.scrollIntoViewRefs = []
-    const { labels, currentlyPlayingLabelIds } = this.props
+    const { labels, currentlyPlayingLabelIds, compact = false } = this.props
     return (
       <div className="LabelTable">
-        <Table>
-          <TableHead>
-            <TableRow>
-              <TableCell>Classifier</TableCell>
-              <TableCell>Start (Seconds)</TableCell>
-              <TableCell>End (Seconds)</TableCell>
-              <TableCell />
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {labels.map((label) => (
-              <this.LabelTableRow
-                key={label.id}
-                label={label}
-                isPlaying={currentlyPlayingLabelIds.has(label.id)}
-              />
-            ))}
-          </TableBody>
-        </Table>
+        {compact ? (
+          <MaterialList dense={true}>
+            <ListSubheader style={{ background: "white" }}>Labels</ListSubheader>
+            {labels.size === 0 ? (
+              <ListItem>
+                <ListItemText primary="No labels found..." />
+              </ListItem>
+            ) : (
+              labels.map((label) => (
+                <this.LabelListItem
+                  key={label.id}
+                  label={label}
+                  isPlaying={currentlyPlayingLabelIds.has(label.id)}
+                />
+              ))
+            )}
+          </MaterialList>
+        ) : (
+          <Table>
+            <TableHead>
+              <TableRow>
+                <TableCell>Classifier</TableCell>
+                <TableCell>Start (Seconds)</TableCell>
+                <TableCell>End (Seconds)</TableCell>
+                <TableCell />
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {labels.map((label) => (
+                <this.LabelTableRow
+                  key={label.id}
+                  label={label}
+                  isPlaying={currentlyPlayingLabelIds.has(label.id)}
+                />
+              ))}
+            </TableBody>
+          </Table>
+        )}
       </div>
     )
   }
@@ -106,6 +132,38 @@ export class LabelTable extends React.PureComponent<ILabelTableProps> {
           </div>
         </TableCell>
       </TableRow>
+    )
+  }
+
+  private LabelListItem: StatelessComponent<{ label: Label; isPlaying?: boolean }> = ({
+    label,
+    isPlaying = false,
+  }) => {
+    const { startTime, endTime } = label
+    const { classifications } = this.state
+
+    return (
+      <ListItem selected={isPlaying}>
+        <ListItemText
+          primary={
+            <span ref={(ref) => isPlaying && ref && this.scrollIntoViewRefs.push(ref)}>
+              <ClassificationSelect
+                {...{ classifications, label }}
+                updateLabelClassification={this.props.updateLabelClassification}
+              />
+            </span>
+          }
+          secondary={`${startTime} - ${endTime}`}
+        />
+        <ListItemSecondaryAction>
+          <IconButton color="primary" onClick={this.handlePlayLabel(label)}>
+            <PlayArrow />
+          </IconButton>
+          <IconButton color="secondary" onClick={this.handleDeleteLabel(label)}>
+            <Delete />
+          </IconButton>
+        </ListItemSecondaryAction>
+      </ListItem>
     )
   }
 
