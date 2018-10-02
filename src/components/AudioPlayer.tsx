@@ -1,4 +1,4 @@
-import { Button, Paper, Select, Tooltip, Typography } from "@material-ui/core"
+import { Button, LinearProgress, Paper, Select, Tooltip, Typography } from "@material-ui/core"
 import {
   AddComment,
   CloudDownload,
@@ -42,6 +42,7 @@ interface IAudioPlayerState {
   classification: string
   classifications: List<Classification>
   currentlyPlayingLabelIds: Set<number>
+  isLoading: boolean
   labels: List<Label>
   wavesurferRegionIdToLabelIdMap: Map<string | number, number>
   wavesurfer?: WaveSurferInstance & WaveSurferRegions
@@ -69,6 +70,7 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
     classification: "default",
     classifications: List(),
     currentlyPlayingLabelIds: Set(),
+    isLoading: true,
     labels: List(),
     wavesurferRegionIdToLabelIdMap: Map(),
     zoom: 50,
@@ -134,6 +136,7 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
     // Only after ready we should bind region handlers to avoid duplicating already create labels
     wavesurfer.on("ready", () => {
       console.info("Wavesurfer ready")
+      this.setState({ isLoading: false })
       wavesurfer.on("region-created", this.handleWavesurferRegionCreate)
       wavesurfer.on("region-in", async ({ id: regionId }: Region) => {
         this.state.wavesurferRegionIdToLabelIdMap
@@ -316,7 +319,8 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
                 </Button>
               </div>
             )}
-
+            
+            {this.state.isLoading && <LinearProgress />}
             <div ref={this.wavesurferContainerRef} style={maxWidthRefStyles} />
             <div ref={this.timelineRef} style={maxWidthRefStyles} />
             <div ref={this.spectrogramRef} style={maxWidthRefStyles} />
