@@ -62,9 +62,9 @@ export class App extends React.Component<any, IAppState> {
                 Classifications
               </Button>
             </Tooltip>
-            <Tooltip title="Export all labels to ~/reverb-export">
-              <NotificationContext.Consumer>
-                {({ notify }) => (
+            <NotificationContext.Consumer>
+              {({ notify }) => (
+                <Tooltip title="Export all labels to ~/reverb-export">
                   <Button
                     color="secondary"
                     onClick={() =>
@@ -77,9 +77,9 @@ export class App extends React.Component<any, IAppState> {
                   >
                     Export All Labels
                   </Button>
-                )}
-              </NotificationContext.Consumer>
-            </Tooltip>
+                </Tooltip>
+              )}
+            </NotificationContext.Consumer>
           </nav>
 
           <main className="main" style={{ gridArea: "main", marginRight: "1em" }}>

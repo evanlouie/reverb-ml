@@ -9,7 +9,7 @@ import {
   ZoomOut,
 } from "@material-ui/icons"
 import { Buffer } from "buffer"
-import { List, Map, Range, Seq, Set } from "immutable"
+import { List, Map, Range, Set } from "immutable"
 import { basename, dirname } from "path"
 import React from "react"
 import WaveSurfer, { WaveSurferInstance } from "wavesurfer.js"
