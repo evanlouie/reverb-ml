@@ -1,4 +1,4 @@
-import { Button, Paper, Select, TextField, Tooltip, Typography } from "@material-ui/core"
+import { Button, Paper, Select, Tooltip, Typography } from "@material-ui/core"
 import {
   AddComment,
   CloudDownload,
@@ -77,6 +77,7 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
   /**
    * DOM refs to keep track of elements for WaveSurfer to mount
    */
+  private videoRef = React.createRef<HTMLVideoElement>()
   private wavesurferContainerRef = React.createRef<HTMLDivElement>()
   private timelineRef = React.createRef<HTMLDivElement>()
   private spectrogramRef = React.createRef<HTMLDivElement>()
@@ -85,6 +86,13 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
    * On initial mount, initialize PeaksJS into DOM
    */
   public async componentDidMount() {
+    // Mute video
+    this.videoElement()
+      .then((element) => {
+        element.volume = 0
+      })
+      .catch(console.info)
+
     const { audioFile_, zoom: minPxPerSec, audioUrl } = this.state
     Classification.find().then((classificationsArr) => {
       const classifications = this.state.classifications.concat(classificationsArr)
@@ -178,6 +186,28 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
         // region.play();
         wavesurfer.play(region.start, region.end)
       })
+      wavesurfer.on("play", () => {
+        this.videoElement()
+          .then((el) => {
+            el.play()
+          })
+          .catch(console.info)
+      })
+      wavesurfer.on("pause", () => {
+        this.videoElement()
+          .then((el) => {
+            el.pause()
+          })
+          .catch(console.info)
+      })
+      wavesurfer.on("seek", async (progress: number) => {
+        this.videoElement()
+          .then((el) => {
+            const jumpTo = progress * el.duration
+            el.currentTime = jumpTo
+          })
+          .catch(console.info)
+      })
     })
     wavesurfer.load(audioUrl)
     this.setState({
@@ -196,8 +226,9 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
   }
 
   public render() {
-    const { wavesurfer, classifications } = this.state
+    const { wavesurfer, classifications, audioUrl } = this.state
     const maxWidthRefStyles = { width: "100%", minWidth: "20vw" }
+    const isVideo = this.isVideoFile(this.props.filepath)
 
     const classificationOption = ({ id, name }: Classification) => (
       <option key={id} value={name}>
@@ -205,17 +236,21 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
       </option>
     )
     return (
-      // tslint:disable-next-line:jsx-no-lambda
       <div
         className="AudioPlayer"
-        style={{ display: "flex", flexDirection: "column", height: "100%" }}
+        style={{
+          display: "flex",
+          flexDirection: isVideo ? "row" : "column",
+          height: "100%",
+        }}
         onKeyPress={() => console.log("KEY PRESSED")}
       >
-        <Typography variant="title" gutterBottom={true}>
+        {/* <Typography variant="title" gutterBottom={true}>
           {this.props.filepath}
-        </Typography>
+        </Typography> */}
         <div
           style={{
+            flex: isVideo ? "2" : "1",
             paddingBottom: "5px",
             marginBottom: "5px",
           }}
@@ -231,6 +266,7 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
                 {classifications.map(classificationOption)}
               </Select>
             </Tooltip>
+            {isVideo && <video ref={this.videoRef} src={audioUrl} style={{ maxWidth: "100%" }} />}
 
             {wavesurfer && (
               <div className="toolbar">
@@ -287,14 +323,17 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
           </Paper>
         </div>
         {wavesurfer && (
-          <div style={{ flex: 1, height: 0, overflow: "scroll" }}>
-            <LabelTable
-              labels={this.state.labels}
-              currentlyPlayingLabelIds={this.state.currentlyPlayingLabelIds}
-              playLabel={this.handlePlayLabel}
-              deleteLabel={this.handleDeleteLabel}
-              updateLabelClassification={this.handleUpdateLabelClassification}
-            />
+          <div style={{ flex: isVideo ? "1" : "2", overflow: "scroll" }}>
+            <div style={{ flex: "1 1", height: "1px" }}>
+              <LabelTable
+                compact={isVideo}
+                labels={this.state.labels}
+                currentlyPlayingLabelIds={this.state.currentlyPlayingLabelIds}
+                playLabel={this.handlePlayLabel}
+                deleteLabel={this.handleDeleteLabel}
+                updateLabelClassification={this.handleUpdateLabelClassification}
+              />
+            </div>
           </div>
         )}
       </div>
@@ -561,5 +600,19 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
         region.color = stringToRGBA(updatedLabel.classification.name)
       })
     this.setState({ labels: this.state.labels.set(updateIndex, updatedLabel) })
+  }
+
+  private videoElement = async () => {
+    return this.videoRef.current
+      ? this.videoRef.current
+      : Promise.reject(new Error(`videoRef not found`))
+  }
+
+  private isVideoFile = (filename: string) => {
+    return (
+      ["mp4", "ogv", "webm"].findIndex((extension) => {
+        return !!filename.match(new RegExp(`.${extension}$`, "i"))
+      }) >= 0
+    )
   }
 }
