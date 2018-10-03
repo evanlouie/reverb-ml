@@ -121,11 +121,14 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
     )
     const wavesurfer = WaveSurfer.create({
       container: this.wavesurferContainerRef.current as HTMLDivElement,
-      waveColor: "violet",
-      progressColor: "purple",
-      scrollParent: true,
+      forceDecode: true,
       hideScrollbar: false,
+      loopSelection: true,
       minPxPerSec,
+      progressColor: "purple",
+      responsive: true,
+      scrollParent: true,
+      waveColor: "violet",
       plugins: [
         TimelinePlugin.create({ container: this.timelineRef.current as HTMLDivElement }),
         MinimapPlugin.create(),
@@ -175,6 +178,7 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
           .forEach(([labelIndex, label]) => {
             label.startTime = start
             label.endTime = end
+            // Update label
             label.save().then((updatedLabel) => {
               this.setState({
                 labels: this.state.labels
@@ -182,12 +186,28 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
                   .sort((a, b) => a.startTime - b.startTime),
               })
             })
+            // Update WAV sample
+            Promise.all([
+              this.state.audioBuffer_,
+              Label.getRepository().find({ relations: ["sampleData"], where: { id: label.id } }),
+            ]).then(([audioBuffer, labelsWithSample]) => {
+              labelsWithSample.forEach((labelWithSample) => {
+                const { sampleData } = labelWithSample
+                sliceAudioBuffer(audioBuffer, label.startTime, label.endTime).then(
+                  (slicedSegment) => {
+                    sampleData.blob = Buffer.from(WavEncoder.encode(slicedSegment))
+                    sampleData.save().then((updated) => {
+                      console.info(`Updated DataBlob ${updated.id}`)
+                    })
+                  },
+                )
+              })
+            })
           })
       })
       wavesurfer.on("region-dblclick", async (region: Region) => {
         // BUG: calling region.play() continues to play after exiting the region
-        // region.play();
-        wavesurfer.play(region.start, region.end)
+        region.play()
       })
       wavesurfer.on("play", () => {
         this.videoElement()
@@ -319,7 +339,7 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
                 </Button>
               </div>
             )}
-            
+
             {this.state.isLoading && <LinearProgress />}
             <div ref={this.wavesurferContainerRef} style={maxWidthRefStyles} />
             <div ref={this.timelineRef} style={maxWidthRefStyles} />
