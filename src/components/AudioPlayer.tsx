@@ -1,4 +1,4 @@
-import { Button, LinearProgress, Paper, Select, Tooltip, Typography } from "@material-ui/core"
+import { Button, LinearProgress, Paper, Select, Tooltip } from "@material-ui/core"
 import {
   AddComment,
   CloudDownload,
@@ -66,7 +66,7 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
   public state: IAudioPlayerState = {
     audioBuffer_: new Response(this.props.audioBlob)
       .arrayBuffer()
-      .then((buffer) => new OfflineAudioContext(2, 16000 * 40, 16000).decodeAudioData(buffer)), // two channels at 16000hz
+      .then((buffer) => new OfflineAudioContext(2, 44100 * 60, 44100).decodeAudioData(buffer)), // two channels at 16000hz
     audioUrl: URL.createObjectURL(this.props.audioBlob),
     audioFile_: AudioPlayer.getRecord(this.props.filepath),
     classification: "default",
