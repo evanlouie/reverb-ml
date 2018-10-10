@@ -1,3 +1,5 @@
+import { Range } from "immutable"
+
 export const stringToRGBA = (
   str: string,
   options?: { red?: number; green?: number; blue?: number; alpha?: number },
@@ -17,17 +19,19 @@ const _cache: { [key: string]: any } = {}
  * @returns {string} of format `#000000`
  */
 const stringToHexColour = (str: string): string => {
-  let hash = 0
-  for (let i = 0; i < str.length; i++) {
+  const hash = str.split("").reduce((carry, char) => {
     // tslint:disable-next-line:no-bitwise
-    hash = str.charCodeAt(i) + ((hash << 5) - hash)
-  }
-  let colour = "#"
-  for (let i = 0; i < 3; i++) {
-    // tslint:disable-next-line:no-bitwise
-    const value = (hash >> (i * 8)) & 0xff
-    colour += ("00" + value.toString(16)).substr(-2)
-  }
+    return char.charCodeAt(0) + ((carry << 5) - carry)
+  }, 0)
+
+  const colour = Range()
+    .take(3)
+    .reduce((carry, _, index) => {
+      // tslint:disable-next-line:no-bitwise
+      const value = (hash >> (index * 8)) & 0xff
+      return carry + ("00" + value.toString(16)).substr(-2)
+    }, "#")
+
   return colour
 }
 
