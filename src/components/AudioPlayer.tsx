@@ -5,6 +5,7 @@ import {
   GraphicEq,
   Pause,
   PlayArrowRounded,
+  Save,
   ZoomIn,
   ZoomOut,
 } from "@material-ui/icons"
@@ -20,6 +21,7 @@ import RegionsPlugin, {
 } from "wavesurfer.js/dist/plugin/wavesurfer.regions.js"
 import SpectrogramPlugin from "wavesurfer.js/dist/plugin/wavesurfer.spectrogram.js"
 import TimelinePlugin from "wavesurfer.js/dist/plugin/wavesurfer.timeline.js"
+import { NotificationContext } from "../contexts/NotificationContext"
 import { AudioFile } from "../entities/AudioFile"
 import { Classification } from "../entities/Classification"
 import { DataBlob } from "../entities/DataBlob"
@@ -121,7 +123,6 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
     )
     const wavesurfer = WaveSurfer.create({
       container: this.wavesurferContainerRef.current as HTMLDivElement,
-      forceDecode: true,
       hideScrollbar: false,
       loopSelection: true,
       minPxPerSec,
@@ -189,7 +190,11 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
             // Update WAV sample
             Promise.all([
               this.state.audioBuffer_,
-              Label.getRepository().find({ relations: ["sampleData"], where: { id: label.id } }),
+              Label.getRepository().find({
+                relations: ["sampleData"],
+                where: { id: label.id },
+                take: 1,
+              }),
             ]).then(([audioBuffer, labelsWithSample]) => {
               labelsWithSample.forEach((labelWithSample) => {
                 const { sampleData } = labelWithSample
@@ -303,11 +308,42 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
                     <Pause />
                   </Button>
                 </Tooltip>
-                <Tooltip title={`Export labels for ${this.props.filepath} to '~/reverb-export'`}>
-                  <Button mini={true} onClick={this.handleDownloadLabels}>
-                    <CloudDownload />
-                  </Button>
-                </Tooltip>
+                <NotificationContext.Consumer>
+                  {({ notify }) => {
+                    const notifiedHandler = async () =>
+                      this.handleSaveLabels().then((dataBlobs) => {
+                        notify(`${dataBlobs.length} successfully saved to database.`)
+                      })
+                    return (
+                      <Tooltip
+                        title={`(Re)Save labels for ${
+                          this.props.filepath
+                        }. Useful if data somehow changed or got corrupted.`}
+                      >
+                        <Button mini={true} onClick={notifiedHandler}>
+                          <Save />
+                        </Button>
+                      </Tooltip>
+                    )
+                  }}
+                </NotificationContext.Consumer>
+                <NotificationContext.Consumer>
+                  {({ notify }) => {
+                    const notifiedHandler = async () =>
+                      this.handleDownloadLabels().then(() =>
+                        notify(`Export labels for ${this.props.filepath} to '~/reverb-export'`),
+                      )
+                    return (
+                      <Tooltip
+                        title={`Export labels for ${this.props.filepath} to '~/reverb-export'`}
+                      >
+                        <Button mini={true} onClick={notifiedHandler}>
+                          <CloudDownload />
+                        </Button>
+                      </Tooltip>
+                    )
+                  }}
+                </NotificationContext.Consumer>
                 <Tooltip title="Add Label">
                   <Button mini={true} color="primary" onClick={this.handleAddLabel}>
                     <AddComment />
@@ -414,7 +450,7 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
       end: endTime,
       color: stringToRGBA(classification.name),
     }
-    const region = await this.wavesurfer().then((ws) => ws.addRegion(wavesurferRegion))
+    const region_ = this.wavesurfer().then((ws) => ws.addRegion(wavesurferRegion))
     const savedLabel = Label.create({
       startTime,
       endTime,
@@ -426,8 +462,10 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
       .catch((err) => {
         console.error(err)
         console.log(`Failed to save Label, removing corresponding region`)
-        region.remove()
-        console.info(`Removed region ${region.id} from player`)
+        region_.then((region) => {
+          region.remove()
+          console.info(`Removed region ${region.id} from player`)
+        })
         return Promise.reject(err)
       })
 
@@ -462,11 +500,15 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
   private handleLabelChange: React.ChangeEventHandler<HTMLInputElement> = async ({ target }) =>
     this.setState({ classification: target.value })
 
-  private handleDownloadLabels = async () =>
-    (({ audioFile_ } = this.state) =>
-      audioFile_
-        .then(({ id }) => AudioFile.exportLabels(id))
-        .then(() => console.log("Export Complete")))()
+  private handleSaveLabels = async () => {
+    return this.resaveAllLabelSamples()
+  }
+
+  private handleDownloadLabels = async () => {
+    return this.state.audioFile_
+      .then(({ id }) => AudioFile.exportLabels(id))
+      .then(() => console.log("Export Complete"))
+  }
 
   private handleAddLabel = async () => {
     const { classification } = this.state
@@ -570,7 +612,7 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
 
   private wavesurfer = async () => {
     const { wavesurfer: ws } = this.state
-    return ws || Promise.reject("Wavesurfer not initialized")
+    return ws || Promise.reject(new Error("Wavesurfer not initialized"))
   }
 
   private handlePlayLabel = async ({ id: targetLabelId }: Label) => {
@@ -584,6 +626,45 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
       })
   }
 
+  private playLabelSampleData = async (targetLabelId: number) => {
+    this.state.wavesurferRegionIdToLabelIdMap
+      .filter((labelId) => labelId === targetLabelId)
+      .forEach((labelId) => {
+        Label.getRepository()
+          .find({ relations: ["sampleData"], where: { id: labelId }, take: 1 })
+          .then((labelsWithSample) => {
+            labelsWithSample.forEach((label) => {
+              new Response(label.sampleData.blob).blob().then((blob) => {
+                const url = URL.createObjectURL(blob)
+                const audio = new Audio(url)
+                audio.play()
+              })
+            })
+          })
+      })
+  }
+
+  private resaveAllLabelSamples = async () => {
+    const labelIds = this.state.labels.map((label) => label.id).toArray()
+    return Promise.all([
+      this.state.audioBuffer_,
+      Label.getRepository().findByIds(labelIds, { relations: ["sampleData"] }),
+    ]).then(([audioBuffer, labelsWithSample]) => {
+      return Promise.all(
+        labelsWithSample.map((labelWithSample) => {
+          const { sampleData, startTime, endTime } = labelWithSample
+          return sliceAudioBuffer(audioBuffer, startTime, endTime).then((slicedSegment) => {
+            sampleData.blob = Buffer.from(WavEncoder.encode(slicedSegment))
+            return sampleData.save().then((updated) => {
+              console.info(`Updated DataBlob ${updated.id}`)
+              return updated
+            })
+          })
+        }),
+      )
+    })
+  }
+
   private handleDeleteLabel = async (label: Label) => {
     const { id: targetLabelId } = label
     const wavesurfer = await this.wavesurfer()
@@ -591,16 +672,27 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
       .filter((labelId) => labelId === targetLabelId)
       .map((_, regionId) => wavesurfer.regions.list[regionId])
       .take(1)
-      .forEach(async (region) => {
+      .forEach((region) => {
         // Delete from state
         const { labels } = this.state
         this.setState({
           labels: labels.delete(labels.findIndex(({ id: labelId }) => labelId === targetLabelId)),
         })
         // Remove from DB
-        label.remove().then((deletedLabel) => {
-          console.log(`Label ${deletedLabel.id} removed.`)
-        })
+        Label.getRepository()
+          .find({ relations: ["sampleData"], where: { id: label.id }, take: 1 })
+          .then((labelsWithSample) => {
+            labelsWithSample.forEach((labelWithSample) => {
+              const { sampleData, id: labelId } = labelWithSample
+              labelWithSample.remove().then((_) => {
+                console.log(`Label ${labelId} removed.`)
+                const { id: sampleId } = sampleData
+                sampleData.remove().then((__) => {
+                  console.log(`DataBlob ${sampleId} removed.`)
+                })
+              })
+            })
+          })
         // Remove from wavesurfer
         region.remove()
       })
