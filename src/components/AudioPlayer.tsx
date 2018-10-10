@@ -66,7 +66,7 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
   public state: IAudioPlayerState = {
     audioBuffer_: new Response(this.props.audioBlob)
       .arrayBuffer()
-      .then((buffer) => new OfflineAudioContext(2, 44100 * 60, 44100).decodeAudioData(buffer)), // two channels at 16000hz
+      .then((buffer) => new AudioContext().decodeAudioData(buffer)),
     audioUrl: URL.createObjectURL(this.props.audioBlob),
     audioFile_: AudioPlayer.getRecord(this.props.filepath),
     classification: "default",
@@ -142,7 +142,7 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
       console.info("Wavesurfer ready")
       this.setState({ isLoading: false })
       wavesurfer.on("region-created", this.handleWavesurferRegionCreate)
-      wavesurfer.on("region-in", async ({ id: regionId }: Region) => {
+      wavesurfer.on("region-in", async ({ id: regionId }) => {
         this.state.wavesurferRegionIdToLabelIdMap
           .filter((_, possibleRegionId) => possibleRegionId === regionId)
           .take(1)
@@ -152,7 +152,7 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
             })
           })
       })
-      wavesurfer.on("region-out", async ({ id: regionId }: Region) => {
+      wavesurfer.on("region-out", async ({ id: regionId }) => {
         this.state.wavesurferRegionIdToLabelIdMap
           .filter((_, possibleRegionId) => possibleRegionId === regionId)
           .take(1)
@@ -162,10 +162,10 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
             })
           })
       })
-      wavesurfer.on("region-updated", async ({ id: regionId }: Region) => {
+      wavesurfer.on("region-updated", async ({ id: regionId }) => {
         // console.info(`Updating region ${regionId}`);
       })
-      wavesurfer.on("region-update-end", async ({ id: targetRegionId, start, end }: Region) => {
+      wavesurfer.on("region-update-end", async ({ id: targetRegionId, start, end }) => {
         console.info(`Updating region position ${targetRegionId}`)
         this.state.wavesurferRegionIdToLabelIdMap
           .filter((_, possibleRegionId) => possibleRegionId === targetRegionId)
@@ -210,14 +210,22 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
             })
           })
       })
-      wavesurfer.on("region-dblclick", async (region: Region) => {
+      wavesurfer.on("region-dblclick", (region) => {
         // BUG: calling region.play() continues to play after exiting the region
         region.play()
       })
-      wavesurfer.on("play", () => {
+      wavesurfer.on("region-play", (region) => {
         this.videoElement()
           .then((el) => {
-            el.play()
+            el.currentTime = region.start
+          })
+          .catch(console.info)
+      })
+      wavesurfer.on("play", () => {
+        Promise.all([this.wavesurfer(), this.videoElement()])
+          .then(([ws, video]) => {
+            video.currentTime = ws.getCurrentTime()
+            video.play()
           })
           .catch(console.info)
       })
