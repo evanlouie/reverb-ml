@@ -1,4 +1,5 @@
 import { Button, Snackbar, Tooltip, Typography } from "@material-ui/core"
+import { List } from "immutable"
 import React from "react"
 import { NotificationContext } from "../contexts/NotificationContext"
 import { AudioFile } from "../entities/AudioFile"
@@ -11,19 +12,36 @@ import { Header } from "./Header"
 interface IAppState {
   mediaFiles: IAudioPlayerProps[]
   currentPage?: "player" | "classifications" | "labels"
+  errors: List<string>
 }
 
 const defaultState: IAppState = {
   mediaFiles: [],
+  errors: List(),
 }
 
 export class App extends React.Component<any, IAppState> {
   public state: IAppState = defaultState
 
+  public componentDidCatch(error: Error | null, info: object) {
+    console.log(error, info)
+    this.setState({ errors: this.state.errors.concat(String(error)) })
+  }
+
   public render() {
-    const { mediaFiles, currentPage } = this.state
+    const { mediaFiles, currentPage, errors } = this.state
     return (
       <NotificationContext>
+        {/* Show Errors */}
+        <NotificationContext.Consumer>
+          {({ notify }) => {
+            errors.forEach((error, index) => {
+              notify(error)
+              this.setState({ errors: errors.delete(index) })
+            })
+            return <span />
+          }}
+        </NotificationContext.Consumer>
         <div
           className="App"
           style={{

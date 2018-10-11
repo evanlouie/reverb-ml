@@ -11,6 +11,7 @@ import {
 } from "@material-ui/icons"
 import { Buffer } from "buffer"
 import { List, Map, Range, Set } from "immutable"
+import * as mm from "music-metadata"
 import { basename, dirname } from "path"
 import React from "react"
 import WaveSurfer, { WaveSurferInstance } from "wavesurfer.js"
@@ -38,16 +39,17 @@ export interface IAudioPlayerProps {
 }
 
 interface IAudioPlayerState {
-  audioUrl: string
   audioBuffer_: Promise<AudioBuffer>
   audioFile_: Promise<AudioFile>
+  audioSampleRate_: Promise<number>
+  audioUrl: string
   classification: string
   classifications: List<Classification>
   currentlyPlayingLabelIds: Set<number>
   isLoading: boolean
   labels: List<Label>
-  wavesurferRegionIdToLabelIdMap: Map<string | number, number>
   wavesurfer?: WaveSurferInstance & WaveSurferRegions
+  wavesurferRegionIdToLabelIdMap: Map<string | number, number>
   zoom: number
 }
 
@@ -66,9 +68,24 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
   public state: IAudioPlayerState = {
     audioBuffer_: new Response(this.props.audioBlob)
       .arrayBuffer()
-      .then((buffer) => new AudioContext().decodeAudioData(buffer)),
-    audioUrl: URL.createObjectURL(this.props.audioBlob),
+      .then((buffer) => new AudioContext().decodeAudioData(buffer))
+      .then(({ numberOfChannels }) => {
+        const arrayBuffer_ = new Response(this.props.audioBlob).arrayBuffer()
+        return Promise.all([arrayBuffer_, this.state.audioSampleRate_]).then(
+          ([arrayBuffer, sampleRate]) => {
+            return new OfflineAudioContext(
+              numberOfChannels,
+              sampleRate * 60,
+              sampleRate,
+            ).decodeAudioData(arrayBuffer)
+          },
+        )
+      }),
     audioFile_: AudioPlayer.getRecord(this.props.filepath),
+    audioSampleRate_: mm
+      .parseFile(this.props.filepath)
+      .then((metadata) => metadata.format.sampleRate || 44100),
+    audioUrl: URL.createObjectURL(this.props.audioBlob),
     classification: "default",
     classifications: List(),
     currentlyPlayingLabelIds: Set(),
