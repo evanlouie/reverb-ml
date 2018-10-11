@@ -8,7 +8,7 @@ export const Header: React.StatelessComponent = () => (
       <IconButton color="inherit" aria-label="Menu">
         <Menu />
       </IconButton>
-      <Typography variant="title" color="inherit">
+      <Typography variant="h6" color="inherit">
         ReverbML
       </Typography>
     </Toolbar>

@@ -187,7 +187,7 @@ class LabelTableModal extends React.PureComponent<{
               <IconButton color="inherit" onClick={this.handleClose} aria-label="Close">
                 <Close />
               </IconButton>
-              <Typography variant="title" color="inherit">
+              <Typography variant="h6" color="inherit">
                 {name}
               </Typography>
             </Toolbar>
@@ -197,16 +197,7 @@ class LabelTableModal extends React.PureComponent<{
               labels={labels}
               currentlyPlayingLabelIds={currentlyPlayingLabelIds}
               playLabel={async (label: Label) => {
-                Label.getRepository()
-                  .find({ relations: ["sampleData"], where: { id: label.id } })
-                  .then((labelsWithSample) => {
-                    labelsWithSample.forEach(async (labelWithSample) => {
-                      const blob = await new Response(labelWithSample.sampleData.blob).blob()
-                      const url = URL.createObjectURL(blob)
-                      const audio = new Audio(url)
-                      audio.play()
-                    })
-                  })
+                Label.playAudio(label.id)
               }}
               deleteLabel={async (targetLabel: Label) => {
                 Label.getRepository()

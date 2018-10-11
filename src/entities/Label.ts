@@ -13,6 +13,19 @@ import { DataBlob } from "./DataBlob"
 
 @Entity()
 export class Label extends BaseEntity {
+  public static async playAudio(labelId: number) {
+    Label.getRepository()
+      .find({ relations: ["sampleData"], where: { id: labelId } })
+      .then((labelsWithSample) => {
+        labelsWithSample.forEach(async (labelWithSample) => {
+          const blob = await new Response(labelWithSample.sampleData.blob).blob()
+          const url = URL.createObjectURL(blob)
+          const audio = new Audio(url)
+          audio.play()
+        })
+      })
+  }
+
   @PrimaryGeneratedColumn()
   public id!: number
 

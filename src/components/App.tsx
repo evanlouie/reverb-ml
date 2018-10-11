@@ -89,7 +89,7 @@ export class App extends React.Component<any, IAppState> {
               ))}
             {currentPage === "classifications" && <ClassificationTable />}
             {!currentPage && (
-              <Typography variant="body1">Select audio file before to begin labelling</Typography>
+              <Typography variant="body2">Select audio file before to begin labelling</Typography>
             )}
           </main>
           <NotificationContext.Consumer>

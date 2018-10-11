@@ -29,7 +29,7 @@ import { Label } from "../entities/Label"
 import { sliceAudioBuffer } from "../lib/audio"
 import { stringToRGBA } from "../lib/colour"
 import { getDBConnection } from "../lib/database"
-import { WavEncoder } from "../lib/WavEncoder"
+import { WavAudioEncoder } from "../lib/WavAudioEncoder"
 import { LabelTable } from "./LabelTable"
 
 export interface IAudioPlayerProps {
@@ -198,14 +198,16 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
             ]).then(([audioBuffer, labelsWithSample]) => {
               labelsWithSample.forEach((labelWithSample) => {
                 const { sampleData } = labelWithSample
-                sliceAudioBuffer(audioBuffer, label.startTime, label.endTime).then(
-                  (slicedSegment) => {
-                    sampleData.blob = Buffer.from(WavEncoder.encode(slicedSegment))
+                sliceAudioBuffer(audioBuffer, label.startTime, label.endTime)
+                  .then((slicedSegment) => {
+                    return new Response(WavAudioEncoder.encode(slicedSegment)).arrayBuffer()
+                  })
+                  .then((arrayBuffer) => {
+                    sampleData.blob = Buffer.from(arrayBuffer)
                     sampleData.save().then((updated) => {
                       console.info(`Updated DataBlob ${updated.id}`)
                     })
-                  },
-                )
+                  })
               })
             })
           })
@@ -446,11 +448,12 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
     const audioBuffer = await audioBuffer_
     const slicedSegment = await sliceAudioBuffer(audioBuffer, label.startTime, endTime)
     // DANGEROUS!! Using Node `Buffer` in front-end code so we can save the segment to DB. Will appear as a Uint8Array on client side when queried
+    const arrayBuffer = await new Response(WavAudioEncoder.encode(slicedSegment)).arrayBuffer()
     const [audioFile, classification, sampleData] = await Promise.all([
       audioFile_,
       classification_,
       DataBlob.create({
-        blob: Buffer.from(WavEncoder.encode(slicedSegment)),
+        blob: Buffer.from(arrayBuffer),
       }).save(),
     ])
     const wavesurferRegion = {
@@ -585,11 +588,12 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
 
     const audioBuffer = await audioBuffer_
     const slicedBuffer = await sliceAudioBuffer(audioBuffer, region.start, region.end)
+    const arrayBuffer = await new Response(WavAudioEncoder.encode(slicedBuffer)).arrayBuffer()
     const [audioFile, classification, sampleData] = await Promise.all([
       audioFile_,
       this.getClassification(label),
       DataBlob.create({
-        blob: Buffer.from(WavEncoder.encode(slicedBuffer)),
+        blob: Buffer.from(arrayBuffer),
       }).save(),
     ])
 
@@ -624,6 +628,9 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
   }
 
   private handlePlayLabel = async ({ id: targetLabelId }: Label) => {
+    // Debug: Play the actual stored audio instead
+    // Label.playAudio(targetLabelId)
+
     const wavesurfer = await this.wavesurfer()
     this.state.wavesurferRegionIdToLabelIdMap
       .filter((labelId) => labelId === targetLabelId)
@@ -662,11 +669,15 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
         labelsWithSample.map((labelWithSample) => {
           const { sampleData, startTime, endTime } = labelWithSample
           return sliceAudioBuffer(audioBuffer, startTime, endTime).then((slicedSegment) => {
-            sampleData.blob = Buffer.from(WavEncoder.encode(slicedSegment))
-            return sampleData.save().then((updated) => {
-              console.info(`Updated DataBlob ${updated.id}`)
-              return updated
-            })
+            return new Response(WavAudioEncoder.encode(slicedSegment))
+              .arrayBuffer()
+              .then((arrBuffer) => {
+                sampleData.blob = Buffer.from(arrBuffer)
+                return sampleData.save().then((updated) => {
+                  console.info(`Updated DataBlob ${updated.id}`)
+                  return updated
+                })
+              })
           })
         }),
       )

@@ -5,6 +5,7 @@ export class WavAudioEncoder {
   public static encode(buffer: AudioBuffer): Blob {
     const { sampleRate, numberOfChannels } = buffer
     const encoder = new WavAudioEncoder(sampleRate, numberOfChannels)
+    console.log(sampleRate)
     const float32buffers = [...Array(numberOfChannels)].map((_, i) => buffer.getChannelData(i))
     encoder.encode(float32buffers)
     return encoder.finish()
