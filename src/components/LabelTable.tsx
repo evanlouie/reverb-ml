@@ -15,6 +15,7 @@ import {
 } from "@material-ui/core"
 import { Delete, PlayArrow } from "@material-ui/icons"
 import { List, Set } from "immutable"
+import path from "path"
 import React, { StatelessComponent } from "react"
 import { Classification } from "../entities/Classification"
 import { Label } from "../entities/Label"
@@ -79,6 +80,7 @@ export class LabelTable extends React.PureComponent<ILabelTableProps> {
             <TableHead>
               <TableRow>
                 <TableCell>Classifier</TableCell>
+                <TableCell>File</TableCell>
                 <TableCell>Start (Seconds)</TableCell>
                 <TableCell>End (Seconds)</TableCell>
                 <TableCell />
@@ -103,8 +105,9 @@ export class LabelTable extends React.PureComponent<ILabelTableProps> {
     label,
     isPlaying = false,
   }) => {
-    const { startTime, endTime } = label
+    const { startTime, endTime, audioFile } = label
     const { classifications } = this.state
+
     return (
       <TableRow selected={isPlaying}>
         <TableCell>
@@ -115,6 +118,7 @@ export class LabelTable extends React.PureComponent<ILabelTableProps> {
             />
           </span>
         </TableCell>
+        <TableCell>{path.join(audioFile.dirname, audioFile.basename)}</TableCell>
         <TableCell>{startTime}</TableCell>
         <TableCell>{endTime}</TableCell>
         <TableCell>
