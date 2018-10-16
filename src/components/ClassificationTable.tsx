@@ -167,7 +167,10 @@ class LabelTableModal extends React.PureComponent<{
 
   public async componentDidMount() {
     const { classification } = this.props
-    const labels = await Label.find({ classification })
+    const labels = await Label.getRepository().find({
+      where: { classification },
+      relations: ["audioFile"],
+    })
     this.setState({ labels: List(labels) })
   }
 
