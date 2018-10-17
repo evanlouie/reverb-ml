@@ -1,5 +1,5 @@
 /**
- * Convert seconds to HH:mm:ss.SSS format
+ * Convert seconds to HH-mm-ss.SSS format
  * @param duration {number} duration in seconds to convert
  */
 export const secondsToTime = (duration: number) => {
@@ -25,5 +25,5 @@ export const secondsToTime = (duration: number) => {
     .slice(-3)
     .join("")
 
-  return `${HH}:${mm}:${ss}.${SSS}`
+  return `${HH}-${mm}-${ss}.${SSS}`
 }

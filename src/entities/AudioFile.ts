@@ -26,23 +26,16 @@ export class AudioFile extends BaseEntity {
     const writes_ = Promise.all(
       audioFiles
         .map(({ labels, basename }) => {
-          return labels.map(
-            async ({ id: labelId, sampleData, classification, startTime, endTime }) => {
-              const writeOutDir = path.join(getPath("home"), "reverb-export", classification.name)
-              await ensureDir(writeOutDir)
-              const filename = this.getWriteOutName(
-                basename,
-                classification.name,
-                startTime,
-                endTime,
-              )
-              const writePath = path.join(writeOutDir, filename)
-              const buffer = sampleData.blob
-              await promisify(writeFile)(writePath, buffer)
-              console.log(`Written: ${writePath}`)
-              return writePath
-            },
-          )
+          return labels.map(async ({ sampleData, classification, startTime }) => {
+            const writeOutDir = path.join(getPath("home"), "reverb-export", classification.name)
+            await ensureDir(writeOutDir)
+            const filename = this.getWriteOutName(basename, classification.name, startTime)
+            const writePath = path.join(writeOutDir, filename)
+            const buffer = sampleData.blob
+            await promisify(writeFile)(writePath, buffer)
+            console.log(`Written: ${writePath}`)
+            return writePath
+          })
         })
         .reduce((flattened, arr) => [...flattened, ...arr]),
     )
@@ -59,22 +52,15 @@ export class AudioFile extends BaseEntity {
     const writes_ = Promise.all(
       audioFiles
         .map(({ labels, basename }) => {
-          return labels.map(
-            async ({ id: labelId, sampleData, classification, startTime, endTime }) => {
-              const writeOutDir = path.join(getPath("home"), "reverb-export", classification.name)
-              await ensureDir(writeOutDir)
-              const filename = this.getWriteOutName(
-                basename,
-                classification.name,
-                startTime,
-                endTime,
-              )
-              const writePath = path.join(writeOutDir, filename)
-              const buffer = sampleData.blob
-              await promisify(writeFile)(writePath, buffer)
-              console.log(`Written: ${writePath}`)
-            },
-          )
+          return labels.map(async ({ sampleData, classification, startTime }) => {
+            const writeOutDir = path.join(getPath("home"), "reverb-export", classification.name)
+            await ensureDir(writeOutDir)
+            const filename = this.getWriteOutName(basename, classification.name, startTime)
+            const writePath = path.join(writeOutDir, filename)
+            const buffer = sampleData.blob
+            await promisify(writeFile)(writePath, buffer)
+            console.log(`Written: ${writePath}`)
+          })
         })
         .reduce((flattened, arr) => [...flattened, ...arr]),
     )
@@ -82,13 +68,8 @@ export class AudioFile extends BaseEntity {
     return writes_
   }
 
-  private static getWriteOutName(
-    basename: string,
-    classification: string,
-    startTime: number,
-    endTime: number,
-  ) {
-    return `${basename}_${classification}_${secondsToTime(startTime)}_${secondsToTime(endTime)}.wav`
+  private static getWriteOutName(basename: string, classification: string, startTime: number) {
+    return `${basename}_(${classification})_${secondsToTime(startTime)}.wav`
   }
 
   @PrimaryGeneratedColumn()
