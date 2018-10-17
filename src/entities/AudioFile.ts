@@ -12,7 +12,7 @@ import {
 } from "typeorm"
 import { promisify } from "util"
 import { getPath } from "../lib/electron-helpers"
-import { msToTime } from "../lib/time"
+import { secondsToTime } from "../lib/time"
 import { Label } from "./Label"
 
 @Entity()
@@ -88,7 +88,7 @@ export class AudioFile extends BaseEntity {
     startTime: number,
     endTime: number,
   ) {
-    return `${basename}_${classification}_${msToTime(startTime)}_${msToTime(endTime)}.wav`
+    return `${basename}_${classification}_${secondsToTime(startTime)}_${secondsToTime(endTime)}.wav`
   }
 
   @PrimaryGeneratedColumn()

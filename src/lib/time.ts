@@ -1,8 +1,8 @@
 /**
- * Convert milliseconds to HH:mm:ss.SSS format
- * @param duration {number} duration in ms to convert
+ * Convert seconds to HH:mm:ss.SSS format
+ * @param duration {number} duration in seconds to convert
  */
-export const msToTime = (duration: number) => {
+export const secondsToTime = (duration: number) => {
   const hours = Math.floor(duration / (60 * 60)).toString() // indefinite length
   const minutes = (Math.floor(duration / 60) % 60).toString() // max 2 digits
   const seconds = (Math.floor(duration) % 60).toString() // max 2 digits
@@ -25,7 +25,5 @@ export const msToTime = (duration: number) => {
     .slice(-3)
     .join("")
 
-  console.log(duration)
-  console.log(SSS)
-  return HH + ":" + mm + ":" + ss + "." + SSS
+  return `${HH}:${mm}:${ss}.${SSS}`
 }
