@@ -358,7 +358,7 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
                   {({ notify }) => {
                     const notifiedHandler = async () =>
                       this.handleDownloadLabels().then(() =>
-                        notify(`Export labels for ${this.props.filepath} to '~/reverb-export'`),
+                        notify(`Exported labels for ${this.props.filepath} to '~/reverb-export'`),
                       )
                     return (
                       <Tooltip
