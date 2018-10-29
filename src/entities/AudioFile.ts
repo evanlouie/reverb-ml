@@ -1,4 +1,4 @@
-import { writeFile } from "fs"
+import { readFile, writeFile } from "fs"
 import { ensureDir } from "fs-extra"
 import path from "path"
 import {
