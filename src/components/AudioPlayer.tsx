@@ -47,6 +47,7 @@ interface IAudioPlayerState {
   classifications: List<Classification>
   currentlyPlayingLabelIds: Set<number>
   isLoading: boolean
+  isPlaying: boolean
   labels: List<Label>
   wavesurfer?: WaveSurferInstance & WaveSurferRegions
   wavesurferRegionIdToLabelIdMap: Map<string | number, number>
@@ -90,6 +91,7 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
     classifications: List(),
     currentlyPlayingLabelIds: Set(),
     isLoading: true,
+    isPlaying: false,
     labels: List(),
     wavesurferRegionIdToLabelIdMap: Map(),
     zoom: 50,
@@ -281,10 +283,9 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
   }
 
   public render() {
-    const { wavesurfer, classifications, audioUrl } = this.state
+    const { wavesurfer, classifications, audioUrl, isPlaying } = this.state
     const maxWidthRefStyles = { width: "100%", minWidth: "20vw" }
     const isVideo = this.isVideoFile(this.props.filepath)
-
     const classificationOption = ({ id, name }: Classification) => (
       <option key={id} value={name}>
         {name}
@@ -325,16 +326,19 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
 
             {wavesurfer && (
               <div className="toolbar">
-                <Tooltip title="Play">
-                  <Button mini={true} color="primary" onClick={this.playAudio}>
-                    <PlayArrowRounded />
-                  </Button>
-                </Tooltip>
-                <Tooltip title="Pause">
-                  <Button mini={true} color="secondary" onClick={this.pauseAudio}>
-                    <Pause />
-                  </Button>
-                </Tooltip>
+                {isPlaying ? (
+                  <Tooltip title="Pause">
+                    <Button mini={true} color="secondary" onClick={this.pauseAudio}>
+                      <Pause />
+                    </Button>
+                  </Tooltip>
+                ) : (
+                  <Tooltip title="Play">
+                    <Button mini={true} color="primary" onClick={this.playAudio}>
+                      <PlayArrowRounded />
+                    </Button>
+                  </Tooltip>
+                )}
                 <NotificationContext.Consumer>
                   {({ notify }) => {
                     const notifiedHandler = async () =>
@@ -431,21 +435,17 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
   // Helpers
   ////////////////////////////////////////////////////////////////////////////////
   private playAudio = async () => {
-    const { wavesurfer } = this.state
-    return wavesurfer
-      ? wavesurfer.play()
-      : Promise.reject(
-          new Error(`Failed to call play() on wavesurfer instance; instance: ${wavesurfer}`),
-        )
+    this.wavesurfer().then((w) => {
+      this.setState({ isPlaying: true })
+      w.play()
+    })
   }
 
   private pauseAudio = async () => {
-    const { wavesurfer } = this.state
-    return wavesurfer
-      ? wavesurfer.pause()
-      : Promise.reject(
-          new Error(`Failed to call pause() on wavesurfer instance; instance: ${wavesurfer}`),
-        )
+    this.wavesurfer().then((w) => {
+      this.setState({ isPlaying: false })
+      w.pause()
+    })
   }
 
   private addLabel = async (label: {
