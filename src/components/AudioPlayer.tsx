@@ -2,6 +2,8 @@ import { Button, LinearProgress, Paper, Select, Tooltip } from "@material-ui/cor
 import {
   AddComment,
   CloudDownload,
+  FastForward,
+  FastRewind,
   GraphicEq,
   Pause,
   PlayArrowRounded,
@@ -49,6 +51,7 @@ interface IAudioPlayerState {
   isLoading: boolean
   isPlaying: boolean
   labels: List<Label>
+  playbackRate: number
   wavesurfer?: WaveSurferInstance & WaveSurferRegions
   wavesurferRegionIdToLabelIdMap: Map<string | number, number>
   zoom: number
@@ -93,6 +96,7 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
     isLoading: true,
     isPlaying: false,
     labels: List(),
+    playbackRate: 1,
     wavesurferRegionIdToLabelIdMap: Map(),
     zoom: 50,
   }
@@ -243,6 +247,7 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
           .catch(console.info)
       })
       wavesurfer.on("play", () => {
+        this.setState({ isPlaying: true })
         Promise.all([this.wavesurfer(), this.videoElement()])
           .then(([ws, video]) => {
             video.currentTime = ws.getCurrentTime()
@@ -251,6 +256,7 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
           .catch(console.info)
       })
       wavesurfer.on("pause", () => {
+        this.setState({ isPlaying: false })
         this.videoElement()
           .then((el) => {
             el.pause()
@@ -339,6 +345,16 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
                     </Button>
                   </Tooltip>
                 )}
+                <Tooltip title="Decrease Playback Rate">
+                  <Button mini={true} color="primary" onClick={this.decreasePlaybackRate}>
+                    <FastRewind />
+                  </Button>
+                </Tooltip>
+                <Tooltip title="Increase Playback Rate">
+                  <Button mini={true} color="primary" onClick={this.increasePlaybackRate}>
+                    <FastForward />
+                  </Button>
+                </Tooltip>
                 <NotificationContext.Consumer>
                   {({ notify }) => {
                     const notifiedHandler = async () =>
@@ -435,16 +451,38 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
   // Helpers
   ////////////////////////////////////////////////////////////////////////////////
   private playAudio = async () => {
-    this.wavesurfer().then((w) => {
+    this.wavesurfer().then((ws) => {
       this.setState({ isPlaying: true })
-      w.play()
+      ws.play()
     })
   }
 
   private pauseAudio = async () => {
-    this.wavesurfer().then((w) => {
+    this.wavesurfer().then((ws) => {
       this.setState({ isPlaying: false })
-      w.pause()
+      ws.pause()
+    })
+  }
+
+  private increasePlaybackRate = async () => {
+    return this.setPlaybackRate(this.state.playbackRate * 1.2)
+  }
+
+  private decreasePlaybackRate = async () => {
+    return this.setPlaybackRate(this.state.playbackRate * 0.8)
+  }
+
+  private setPlaybackRate = async (playbackRate: number): Promise<number> => {
+    // Update the video element (if it exists), wavesurfer, and state
+    return this.wavesurfer().then((ws) => {
+      this.videoElement()
+        .then((el) => {
+          el.playbackRate = playbackRate
+        })
+        .catch(() => null)
+      ws.setPlaybackRate(playbackRate)
+      this.setState({ playbackRate })
+      return playbackRate
     })
   }
 
