@@ -204,11 +204,14 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
             label.endTime = end
             // Update label
             label.save().then((updatedLabel) => {
-              this.setState({
-                labels: this.state.labels
-                  .set(labelIndex, updatedLabel)
-                  .sort((a, b) => a.startTime - b.startTime),
-              })
+              this.setState(
+                {
+                  labels: this.state.labels
+                    .set(labelIndex, updatedLabel)
+                    .sort((a, b) => a.startTime - b.startTime),
+                },
+                this.syncRegionWithLabels,
+              )
             })
             // Update WAV sample
             Promise.all([
@@ -332,19 +335,15 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
 
             {wavesurfer && (
               <div className="toolbar">
-                {isPlaying ? (
-                  <Tooltip title="Pause">
-                    <Button mini={true} color="secondary" onClick={this.pauseAudio}>
-                      <Pause />
-                    </Button>
-                  </Tooltip>
-                ) : (
-                  <Tooltip title="Play">
-                    <Button mini={true} color="primary" onClick={this.playAudio}>
-                      <PlayArrowRounded />
-                    </Button>
-                  </Tooltip>
-                )}
+                <Tooltip title={isPlaying ? "Pause" : "Play"}>
+                  <Button
+                    mini={true}
+                    color={isPlaying ? "secondary" : "primary"}
+                    onClick={this.togglePlayPauseAudio}
+                  >
+                    {isPlaying ? <Pause /> : <PlayArrowRounded />}
+                  </Button>
+                </Tooltip>
                 <Tooltip title="Decrease Playback Rate">
                   <Button mini={true} color="primary" onClick={this.decreasePlaybackRate}>
                     <FastRewind />
@@ -450,17 +449,11 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
   ////////////////////////////////////////////////////////////////////////////////
   // Helpers
   ////////////////////////////////////////////////////////////////////////////////
-  private playAudio = async () => {
+  private togglePlayPauseAudio = async () => {
     this.wavesurfer().then((ws) => {
-      this.setState({ isPlaying: true })
-      ws.play()
-    })
-  }
-
-  private pauseAudio = async () => {
-    this.wavesurfer().then((ws) => {
-      this.setState({ isPlaying: false })
-      ws.pause()
+      this.state.isPlaying
+        ? this.setState({ isPlaying: false }, () => ws.pause())
+        : this.setState({ isPlaying: true }, () => ws.play())
     })
   }
 
@@ -470,6 +463,33 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
 
   private decreasePlaybackRate = async () => {
     return this.setPlaybackRate(this.state.playbackRate * 0.8)
+  }
+
+  /**
+   * Clears Wavesurfer of regions and re-adds them all in order of largest to smallest (smaller rendered on top of larger)
+   */
+  private syncRegionWithLabels = async () => {
+    this.wavesurfer().then((ws) => {
+      ws.clearRegions()
+      // Detach "region-created" event so adding regions doesn't trigger label creation
+      ws.un("region-created", this.handleWavesurferRegionCreate)
+
+      // Sort the labels by size (largest first) before re-adding. Large always on bottom
+      this.state.labels
+        .sort((a, b) => b.endTime - b.startTime - (a.endTime - a.startTime))
+        .forEach(({ id: labelId, startTime, endTime, classification: { name } }) => {
+          const region = ws.addRegion({ start: startTime, end: endTime, color: stringToRGBA(name) })
+          this.setState({
+            wavesurferRegionIdToLabelIdMap: this.state.wavesurferRegionIdToLabelIdMap.set(
+              region.id,
+              labelId,
+            ),
+          })
+        })
+
+      // Reattach "region-created"
+      ws.on("region-created", this.handleWavesurferRegionCreate)
+    })
   }
 
   private setPlaybackRate = async (playbackRate: number): Promise<number> => {
