@@ -136,10 +136,9 @@ export class App extends React.Component<any, IAppState> {
         }
       }),
     )
-    if (mediaFiles.length > 0) {
-      this.setState({ mediaFiles, currentPage: "player" })
-    } else {
-      this.setState({ currentPage: undefined })
-    }
+    this.setState({
+      mediaFiles,
+      currentPage: mediaFiles.length > 0 ? "player" : undefined,
+    })
   }
 }

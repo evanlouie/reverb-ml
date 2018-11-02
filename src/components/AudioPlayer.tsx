@@ -64,8 +64,7 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
       basename: basename(filepath),
     }
     return getDBConnection().then(async (_) => {
-      const record = await AudioFile.findOne(props)
-      return record || AudioFile.create(props).save()
+      return AudioFile.findOne(props).then((record) => record || AudioFile.create(props).save())
     })
   }
 
@@ -113,6 +112,8 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
    * On initial mount, initialize PeaksJS into DOM
    */
   public async componentDidMount() {
+    const { audioFile_, zoom: minPxPerSec, audioUrl, classifications, labels } = this.state
+
     // Mute video
     this.videoElement()
       .then((element) => {
@@ -120,166 +121,55 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
       })
       .catch(console.info)
 
-    const { audioFile_, zoom: minPxPerSec, audioUrl } = this.state
     Classification.find().then((classificationsArr) => {
-      const classifications = this.state.classifications.concat(classificationsArr)
+      const allClassifications = classifications.concat(classificationsArr)
       this.setState({
-        classifications,
-        classification: classifications.first({ name: "default" }).name,
+        classifications: allClassifications,
+        classification: allClassifications.first({ name: "default" }).name,
       })
     })
-    const audioFile = await audioFile_
-    const labels = await audioFile
-      .getLabels()
-      .then((unsorted) => unsorted.sort((a, b) => a.startTime - b.startTime))
-    const regions = labels.map(
-      ({ id, startTime: start, endTime: end, classification: { name: labelName } }) => ({
-        id,
-        start,
-        end,
-        color: stringToRGBA(labelName),
-      }),
-    )
-    const wavesurferRegionIdToLabelIdMap = regions.reduce(
-      (carry, { id: regionId }) => carry.set(regionId, regionId),
-      Map<string | number, number>(),
-    )
-    const wavesurfer = WaveSurfer.create({
-      container: this.wavesurferContainerRef.current as HTMLDivElement,
-      hideScrollbar: false,
-      loopSelection: true,
-      minPxPerSec,
-      progressColor: "purple",
-      responsive: true,
-      scrollParent: true,
-      waveColor: "violet",
-      plugins: [
-        TimelinePlugin.create({ container: this.timelineRef.current as HTMLDivElement }),
-        MinimapPlugin.create(),
-        RegionsPlugin.create({ dragSelection: true, regions }),
-      ],
-    }) as WaveSurferInstance & WaveSurferRegions
+    audioFile_.then((audioFile) => {
+      audioFile
+        .getLabels()
+        .then((unsorted) => unsorted.sort((a, b) => a.startTime - b.startTime))
+        .then((sortedLabels) => {
+          const regions = sortedLabels.map(
+            ({ id, startTime: start, endTime: end, classification: { name: labelName } }) => ({
+              id,
+              start,
+              end,
+              color: stringToRGBA(labelName),
+            }),
+          )
 
-    // Only after ready we should bind region handlers to avoid duplicating already create labels
-    wavesurfer.on("ready", () => {
-      console.info("Wavesurfer ready")
-      this.setState({ isLoading: false })
-      wavesurfer.on("region-created", this.handleWavesurferRegionCreate)
-      wavesurfer.on("region-in", async ({ id: regionId }) => {
-        this.state.wavesurferRegionIdToLabelIdMap
-          .filter((_, possibleRegionId) => possibleRegionId === regionId)
-          .take(1)
-          .forEach((labelId, _) => {
-            this.setState({
-              currentlyPlayingLabelIds: this.state.currentlyPlayingLabelIds.add(labelId),
-            })
+          // Only after ready we should bind region handlers to avoid duplicating already create labels
+          const wavesurfer = this.mountWavesurferEvents(WaveSurfer.create({
+            container: this.wavesurferContainerRef.current as HTMLDivElement,
+            hideScrollbar: false,
+            loopSelection: true,
+            minPxPerSec,
+            progressColor: "purple",
+            responsive: true,
+            scrollParent: true,
+            waveColor: "violet",
+            plugins: [
+              TimelinePlugin.create({ container: this.timelineRef.current as HTMLDivElement }),
+              MinimapPlugin.create(),
+              RegionsPlugin.create({ dragSelection: true, regions }),
+            ],
+          }) as WaveSurferInstance & WaveSurferRegions)
+
+          // Load media
+          wavesurfer.load(audioUrl)
+          this.setState({
+            wavesurfer,
+            labels: labels.concat(sortedLabels),
+            wavesurferRegionIdToLabelIdMap: regions.reduce(
+              (carry, { id: regionId }) => carry.set(regionId, regionId),
+              Map<string | number, number>(),
+            ),
           })
-      })
-      wavesurfer.on("region-out", async ({ id: regionId }) => {
-        this.state.wavesurferRegionIdToLabelIdMap
-          .filter((_, possibleRegionId) => possibleRegionId === regionId)
-          .take(1)
-          .forEach((labelId, _) => {
-            this.setState({
-              currentlyPlayingLabelIds: this.state.currentlyPlayingLabelIds.delete(labelId),
-            })
-          })
-      })
-      wavesurfer.on("region-updated", async ({ id: regionId }) => {
-        // console.info(`Updating region ${regionId}`);
-      })
-      wavesurfer.on("region-update-end", async ({ id: targetRegionId, start, end }) => {
-        console.info(`Updating region position ${targetRegionId}`)
-        this.state.wavesurferRegionIdToLabelIdMap
-          .filter((_, possibleRegionId) => possibleRegionId === targetRegionId)
-          .map((labelId) => this.state.labels.findIndex(({ id }) => id === labelId))
-          .filter((labelIndex) => labelIndex >= 0)
-          .map<[number, Label]>((labelIndex) => [
-            labelIndex,
-            this.state.labels.get(labelIndex) as Label,
-          ])
-          .take(1)
-          .forEach(([labelIndex, label]) => {
-            label.startTime = start
-            label.endTime = end
-            // Update label
-            label.save().then((updatedLabel) => {
-              this.setState(
-                {
-                  labels: this.state.labels
-                    .set(labelIndex, updatedLabel)
-                    .sort((a, b) => a.startTime - b.startTime),
-                },
-                this.syncRegionWithLabels,
-              )
-            })
-            // Update WAV sample
-            Promise.all([
-              this.state.audioBuffer_,
-              Label.getRepository().find({
-                relations: ["sampleData"],
-                where: { id: label.id },
-                take: 1,
-              }),
-            ]).then(([audioBuffer, labelsWithSample]) => {
-              labelsWithSample.forEach((labelWithSample) => {
-                const { sampleData } = labelWithSample
-                sliceAudioBuffer(audioBuffer, label.startTime, label.endTime)
-                  .then((slicedSegment) => {
-                    return new Response(WavAudioEncoder.encode(slicedSegment)).arrayBuffer()
-                  })
-                  .then((arrayBuffer) => {
-                    sampleData.blob = Buffer.from(arrayBuffer)
-                    sampleData.save().then((updated) => {
-                      console.info(`Updated DataBlob ${updated.id}`)
-                    })
-                  })
-              })
-            })
-          })
-      })
-      wavesurfer.on("region-dblclick", (region) => {
-        // BUG: calling region.play() continues to play after exiting the region
-        region.play()
-      })
-      wavesurfer.on("region-play", (region) => {
-        this.videoElement()
-          .then((el) => {
-            el.currentTime = region.start
-          })
-          .catch(console.info)
-      })
-      wavesurfer.on("play", () => {
-        this.setState({ isPlaying: true })
-        Promise.all([this.wavesurfer(), this.videoElement()])
-          .then(([ws, video]) => {
-            video.currentTime = ws.getCurrentTime()
-            video.play()
-          })
-          .catch(console.info)
-      })
-      wavesurfer.on("pause", () => {
-        this.setState({ isPlaying: false })
-        this.videoElement()
-          .then((el) => {
-            el.pause()
-          })
-          .catch(console.info)
-      })
-      wavesurfer.on("seek", async (progress: number) => {
-        this.videoElement()
-          .then((el) => {
-            const jumpTo = progress * el.duration
-            el.currentTime = jumpTo
-          })
-          .catch(console.info)
-      })
-    })
-    wavesurfer.load(audioUrl)
-    this.setState({
-      wavesurfer,
-      labels: this.state.labels.concat(labels),
-      wavesurferRegionIdToLabelIdMap,
+        })
     })
   }
 
@@ -475,17 +365,18 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
       ws.un("region-created", this.handleWavesurferRegionCreate)
 
       // Sort the labels by size (largest first) before re-adding. Large always on bottom
-      this.state.labels
+      const { labels, wavesurferRegionIdToLabelIdMap } = this.state
+      const regionLabelMap = labels
         .sort((a, b) => b.endTime - b.startTime - (a.endTime - a.startTime))
-        .forEach(({ id: labelId, startTime, endTime, classification: { name } }) => {
-          const region = ws.addRegion({ start: startTime, end: endTime, color: stringToRGBA(name) })
-          this.setState({
-            wavesurferRegionIdToLabelIdMap: this.state.wavesurferRegionIdToLabelIdMap.set(
-              region.id,
-              labelId,
-            ),
+        .reduce((carry, { id: labelId, startTime, endTime, classification }) => {
+          const region = ws.addRegion({
+            start: startTime,
+            end: endTime,
+            color: stringToRGBA(classification.name),
           })
-        })
+          return carry.set(region.id, labelId)
+        }, wavesurferRegionIdToLabelIdMap.clear())
+      this.setState({ wavesurferRegionIdToLabelIdMap: regionLabelMap })
 
       // Reattach "region-created"
       ws.on("region-created", this.handleWavesurferRegionCreate)
@@ -796,20 +687,22 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
     label: Label,
     classification: Classification,
   ) => {
-    const wavesurfer = await this.wavesurfer()
-    const { labels, wavesurferRegionIdToLabelIdMap } = this.state
-    label.classification = classification
-    const updatedLabel = await label.save()
-    const updateIndex = labels.findIndex(({ id: labelId }) => labelId === label.id)
-    wavesurferRegionIdToLabelIdMap
-      .filter((labelId, _) => labelId === label.id)
-      .map((_, regionId) => wavesurfer.regions.list[regionId])
-      .take(1)
-      .forEach((region) => {
-        // BUG: wavesurfer doesn't update the color until the a redraw is triggered by interacting with waveform
-        region.color = stringToRGBA(updatedLabel.classification.name)
+    this.wavesurfer().then((wavesurfer) => {
+      const { labels, wavesurferRegionIdToLabelIdMap } = this.state
+      label.classification = classification
+      label.save().then((updatedLabel) => {
+        const updateIndex = labels.findIndex(({ id: labelId }) => labelId === label.id)
+        wavesurferRegionIdToLabelIdMap
+          .filter((labelId, _) => labelId === label.id)
+          .map((_, regionId) => wavesurfer.regions.list[regionId])
+          .take(1)
+          .forEach((region) => {
+            // BUG: wavesurfer doesn't update the color until the a redraw is triggered by interacting with waveform
+            region.color = stringToRGBA(updatedLabel.classification.name)
+          })
+        this.setState({ labels: this.state.labels.set(updateIndex, updatedLabel) })
       })
-    this.setState({ labels: this.state.labels.set(updateIndex, updatedLabel) })
+    })
   }
 
   private videoElement = async () => {
@@ -824,5 +717,125 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
         return !!filename.match(new RegExp(`.${extension}$`, "i"))
       }) >= 0
     )
+  }
+
+  /**
+   * Mount the custom events to Wavesurfer
+   */
+  private mountWavesurferEvents = (wavesurfer: WaveSurferInstance & WaveSurferRegions) => {
+    // Only after ready we should bind region handlers to avoid duplicating already create labels
+    wavesurfer.on("ready", () => {
+      console.info("Wavesurfer ready")
+      this.setState({ isLoading: false })
+      wavesurfer.on("region-created", this.handleWavesurferRegionCreate)
+      wavesurfer.on("region-in", async ({ id: regionId }) => {
+        const { wavesurferRegionIdToLabelIdMap, currentlyPlayingLabelIds } = this.state
+        wavesurferRegionIdToLabelIdMap
+          .filter((_, possibleRegionId) => possibleRegionId === regionId)
+          .take(1)
+          .forEach((labelId, _) => {
+            this.setState({
+              currentlyPlayingLabelIds: currentlyPlayingLabelIds.add(labelId),
+            })
+          })
+      })
+      wavesurfer.on("region-out", async ({ id: regionId }) => {
+        const { wavesurferRegionIdToLabelIdMap, currentlyPlayingLabelIds } = this.state
+        wavesurferRegionIdToLabelIdMap
+          .filter((_, possibleRegionId) => possibleRegionId === regionId)
+          .take(1)
+          .forEach((labelId, _) => {
+            this.setState({
+              currentlyPlayingLabelIds: currentlyPlayingLabelIds.delete(labelId),
+            })
+          })
+      })
+      wavesurfer.on("region-update-end", async ({ id: targetRegionId, start, end }) => {
+        const { wavesurferRegionIdToLabelIdMap, labels, audioBuffer_ } = this.state
+        console.info(`Updating region position ${targetRegionId}`)
+        wavesurferRegionIdToLabelIdMap
+          .filter((_, possibleRegionId) => possibleRegionId === targetRegionId)
+          .map((labelId) => labels.findIndex(({ id }) => id === labelId))
+          .filter((labelIndex) => labelIndex >= 0)
+          .map<[number, Label]>((labelIndex) => [labelIndex, labels.get(labelIndex) as Label])
+          .take(1)
+          .forEach(([labelIndex, label]) => {
+            label.startTime = start
+            label.endTime = end
+            // Update label
+            label.save().then((updatedLabel) => {
+              this.setState(
+                {
+                  labels: labels
+                    .set(labelIndex, updatedLabel)
+                    .sort((a, b) => a.startTime - b.startTime),
+                },
+                this.syncRegionWithLabels,
+              )
+            })
+            // Update WAV sample
+            Promise.all([
+              audioBuffer_,
+              Label.getRepository().find({
+                relations: ["sampleData"],
+                where: { id: label.id },
+                take: 1,
+              }),
+            ]).then(([audioBuffer, labelsWithSample]) => {
+              labelsWithSample.forEach((labelWithSample) => {
+                const { sampleData } = labelWithSample
+                sliceAudioBuffer(audioBuffer, label.startTime, label.endTime)
+                  .then((slicedSegment) => {
+                    return new Response(WavAudioEncoder.encode(slicedSegment)).arrayBuffer()
+                  })
+                  .then((arrayBuffer) => {
+                    sampleData.blob = Buffer.from(arrayBuffer)
+                    sampleData.save().then((updated) => {
+                      console.info(`Updated DataBlob ${updated.id}`)
+                    })
+                  })
+              })
+            })
+          })
+      })
+      wavesurfer.on("region-dblclick", (region) => {
+        // BUG: calling region.play() continues to play after exiting the region
+        region.play()
+      })
+      wavesurfer.on("region-play", (region) => {
+        this.videoElement()
+          .then((el) => {
+            el.currentTime = region.start
+          })
+          .catch(console.info)
+      })
+      wavesurfer.on("play", () => {
+        this.setState({ isPlaying: true })
+        Promise.all([this.wavesurfer(), this.videoElement()])
+          .then(([ws, video]) => {
+            video.currentTime = ws.getCurrentTime()
+            video.play()
+          })
+          .catch(console.info)
+      })
+      wavesurfer.on("pause", () => {
+        this.setState({ isPlaying: false })
+        this.videoElement()
+          .then((el) => {
+            el.pause()
+          })
+          .catch(console.info)
+      })
+      wavesurfer.on("seek", async (progress: number) => {
+        this.videoElement()
+          .then((el) => {
+            const jumpTo = progress * el.duration
+            el.currentTime = jumpTo
+          })
+          .catch(console.info)
+      })
+    })
+
+    return wavesurfer
   }
 }
