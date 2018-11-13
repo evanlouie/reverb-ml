@@ -85,7 +85,7 @@ declare module "wavesurfer.js" {
     exportImage(format: string, quality: number): string
     isPlaying(): boolean
     load(url: string, peaks?: {}[], preload?: "none" | "metadata" | "auto"): void
-    loadBlob(url: string): void
+    loadBlob(blob: Blob): void
     on: <E extends keyof WaveSurferEvents>(event: E, listener: WaveSurferEvents[E]) => void
     un: <E extends keyof WaveSurferEvents>(event: E, listener: WaveSurferEvents[E]) => void
     pause(): void

@@ -153,7 +153,9 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
             scrollParent: true,
             waveColor: "violet",
             plugins: [
-              TimelinePlugin.create({ container: this.timelineRef.current as HTMLDivElement }),
+              TimelinePlugin.create({
+                container: this.timelineRef.current as HTMLDivElement,
+              }),
               MinimapPlugin.create(),
               RegionsPlugin.create({ dragSelection: true, regions }),
             ],
@@ -515,7 +517,7 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
 
   private toggleSpectrogram = async () => {
     const ws = await this.wavesurfer()
-    if (Object.keys(ws.initialisedPluginList).includes("spectrogram")) {
+    if (Object.keys(ws.initialisedPluginList).indexOf("spectrogram") >= 0) {
       this.destroySpectrogram(ws)
     } else {
       this.generateSpectrogram(ws)
@@ -528,7 +530,7 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
    * @see https://wavesurfer-js.org/v2/changes.html
    */
   private generateSpectrogram = async (ws: WaveSurferInstance) => {
-    if (Object.keys(ws.initialisedPluginList).includes("spectrogram")) {
+    if (Object.keys(ws.initialisedPluginList).indexOf("spectrogram") >= 0) {
       this.destroySpectrogram(ws)
     }
     ws.addPlugin(
@@ -700,7 +702,9 @@ export class AudioPlayer extends React.PureComponent<IAudioPlayerProps, IAudioPl
             // BUG: wavesurfer doesn't update the color until the a redraw is triggered by interacting with waveform
             region.color = stringToRGBA(updatedLabel.classification.name)
           })
-        this.setState({ labels: this.state.labels.set(updateIndex, updatedLabel) })
+        this.setState({
+          labels: this.state.labels.set(updateIndex, updatedLabel),
+        })
       })
     })
   }

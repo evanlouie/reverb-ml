@@ -14,7 +14,7 @@ import {
   Tooltip,
 } from "@material-ui/core"
 import { Delete, PlayArrow } from "@material-ui/icons"
-import { List, Set } from "immutable"
+import { List, Map, Set } from "immutable"
 import path from "path"
 import React, { StatelessComponent } from "react"
 import { Classification } from "../entities/Classification"
@@ -29,20 +29,25 @@ export interface ILabelTableProps {
   updateLabelClassification: (label: Label, classification: Classification) => Promise<any>
   compact?: boolean
 }
-export class LabelTable extends React.PureComponent<ILabelTableProps> {
+export class LabelTable extends React.PureComponent<
+  ILabelTableProps,
+  { classifications: List<Classification> }
+> {
   public state = {
-    classifications: Object.values(
-      this.props.labels.reduce<{ [id: number]: Classification }>((classifications, label) => {
-        return { ...classifications, [label.classification.id]: label.classification }
-      }, {}),
-    ),
+    classifications: this.props.labels
+      .reduce(
+        (reduction, { classification }) => reduction.set(classification.id, classification),
+        Map<number, Classification>(),
+      )
+      .toList(),
   }
 
   private scrollIntoViewRefs: HTMLElement[] = []
 
   public async componentDidMount() {
-    const classifications = await Classification.find()
-    this.setState({ classifications })
+    Classification.find().then((allClassifiers) => {
+      this.setState({ classifications: this.state.classifications.clear().concat(allClassifiers) })
+    })
   }
 
   public async componentDidUpdate() {
@@ -118,7 +123,9 @@ export class LabelTable extends React.PureComponent<ILabelTableProps> {
             />
           </span>
         </TableCell>
-        <TableCell>{path.join(audioFile.dirname, audioFile.basename)}</TableCell>
+        <TableCell>
+          {audioFile ? path.join(audioFile.dirname, audioFile.basename) : "---"}
+        </TableCell>
         <TableCell>{startTime}</TableCell>
         <TableCell>{endTime}</TableCell>
         <TableCell>
@@ -182,7 +189,7 @@ export class LabelTable extends React.PureComponent<ILabelTableProps> {
 // nested object which is being changed.
 // tslint:disable-next-line:max-classes-per-file
 class ClassificationSelect extends React.PureComponent<{
-  classifications: Classification[]
+  classifications: List<Classification>
   label: Label
   updateLabelClassification: (label: Label, classification: Classification) => Promise<any>
 }> {

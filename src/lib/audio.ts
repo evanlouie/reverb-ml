@@ -20,7 +20,7 @@ export const sliceAudioBuffer = async (
   const audioCtx = new OfflineAudioContext(numberOfChannels, sectionLength, sampleRate)
   const sliceBuffer = audioCtx.createBuffer(numberOfChannels, sectionLength, sampleRate)
 
-  // Copy slices of channels into new buffer
+    // Copy slices of channels into new buffer
   ;[...Array(numberOfChannels)]
     .map((_, i) => buffer.getChannelData(i))
     .map((channelData) => channelData.slice(startSample, endSample))

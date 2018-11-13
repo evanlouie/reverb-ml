@@ -5,7 +5,7 @@
     "declaration": true,
     "module": "commonjs",
     "pretty": true,
-    "target": "esnext",
+    "target": "es6",
     "jsx": "react",
     "esModuleInterop": true,
     "emitDecoratorMetadata": true,

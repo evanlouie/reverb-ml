@@ -54,7 +54,7 @@ export const selectMediaFile = ({ filter = (extension: string) => true } = {}): 
  */
 export const selectAudioFile = () =>
   selectMediaFile({
-    filter: (ext) => ["mp4", "ogv", "webm"].includes(ext) === false,
+    filter: (ext) => ["mp4", "ogv", "webm"].indexOf(ext) >= 0 === false,
   })
 
 /**

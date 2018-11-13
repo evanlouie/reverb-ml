@@ -10,17 +10,17 @@ import { ClassificationTable } from "./ClassificationTable"
 import { Header } from "./Header"
 
 interface IAppState {
-  mediaFiles: IAudioPlayerProps[]
+  mediaFiles: List<IAudioPlayerProps>
   currentPage?: "player" | "classifications" | "labels"
   errors: List<string>
 }
 
 const defaultState: IAppState = {
-  mediaFiles: [],
+  mediaFiles: List(),
   errors: List(),
 }
 
-export class App extends React.Component<any, IAppState> {
+export class App extends React.PureComponent<any, IAppState> {
   public state: IAppState = defaultState
 
   public componentDidCatch(error: Error | null, info: object) {
@@ -137,7 +137,7 @@ export class App extends React.Component<any, IAppState> {
       }),
     )
     this.setState({
-      mediaFiles,
+      mediaFiles: this.state.mediaFiles.clear().concat(mediaFiles),
       currentPage: mediaFiles.length > 0 ? "player" : undefined,
     })
   }

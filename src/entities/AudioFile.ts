@@ -85,6 +85,6 @@ export class AudioFile extends BaseEntity {
   public labels!: Label[]
 
   public async getLabels(): Promise<Label[]> {
-    return Label.find({ audioFile: this })
+    return Label.getRepository().find({ relations: ["audioFile"], where: { audioFile: this } })
   }
 }

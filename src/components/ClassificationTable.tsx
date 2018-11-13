@@ -13,7 +13,7 @@ import {
   Typography,
 } from "@material-ui/core"
 import { Close, Delete, OpenInNew, SaveAlt } from "@material-ui/icons"
-import { List, Set } from "immutable"
+import { List, Map, Set } from "immutable"
 import React from "react"
 import { NotificationContext } from "../contexts/NotificationContext"
 import { Classification } from "../entities/Classification"
@@ -22,14 +22,15 @@ import { getDBConnection } from "../lib/database"
 import { ClassificationFormDialog } from "./ClassificationFormDialog"
 import { LabelTable } from "./LabelTable"
 
-export class ClassificationTable extends React.PureComponent {
-  public state: {
-    classifications: Classification[]
-    labelCounts: { [classificationId: number]: number }
-    expandedClassification: number
-  } = {
-    classifications: [],
-    labelCounts: {},
+interface IState {
+  classifications: List<Classification>
+  labelCounts: Map<number, number>
+  expandedClassification: number
+}
+export class ClassificationTable extends React.PureComponent<{}, IState> {
+  public state: IState = {
+    classifications: List(),
+    labelCounts: Map(),
     expandedClassification: -1,
   }
 
@@ -77,7 +78,7 @@ export class ClassificationTable extends React.PureComponent {
                   <TableRow key={id}>
                     <TableCell>{id}</TableCell>
                     <TableCell>{name}</TableCell>
-                    <TableCell>{labelCounts[id] || "---"}</TableCell>
+                    <TableCell>{labelCounts.get(id, "---")}</TableCell>
                     <TableCell>
                       <NotificationContext.Consumer>
                         {({ notify }) => (
@@ -140,12 +141,11 @@ export class ClassificationTable extends React.PureComponent {
   private refreshClassifications = async () => {
     const classifications = await Classification.find()
     classifications.forEach(async (classification) => {
-      const labelCount = await Label.count({ classification })
-      this.setState({
-        labelCounts: { ...this.state.labelCounts, [classification.id]: labelCount },
+      Label.count({ classification }).then((labelCount) => {
+        this.setState({ labelCounts: this.state.labelCounts.set(classification.id, labelCount) })
       })
     })
-    this.setState({ classifications })
+    this.setState({ classifications: this.state.classifications.clear().concat(classifications) })
     return classifications
   }
 }
